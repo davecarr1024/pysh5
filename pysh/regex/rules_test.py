@@ -2,21 +2,41 @@ import unittest
 from .rules import *
 
 
+def _state(s: str = '') -> CharStream:
+    return CharStream.load(s)
+
+
+def _result(s: str = '') -> Result:
+    return Result(_state(s).chars)
+
+
+class ResultTest(unittest.TestCase):
+    def test_add(self):
+        for lhs, rhs, expected in list[tuple[Result, Result, Result]]([
+            (_result(), _result(), _result()),
+            (_result('a'), _result(), _result('a')),
+            (_result(), _result('a'), _result('a')),
+            (_result('a'), _result('b'), _result('ab')),
+        ]):
+            with self.subTest(lhs=lhs, rhs=rhs, expected=expected):
+                self.assertEqual(lhs + rhs, expected)
+
+
 class LiteralTest(unittest.TestCase):
     def test_call(self):
-        for state, expected in list[tuple[State, StateAndResult]]([
+        for state, expected in list[tuple[CharStream, StateAndResult]]([
             (
-                State.load('a'),
+                _state('a'),
                 (
-                    State(),
-                    Result('a'),
+                    _state(),
+                    _result('a'),
                 ),
             ),
             (
-                State.load('ab'),
+                _state('ab'),
                 (
-                    State.load('b'),
-                    Result('a'),
+                    _state('b'),
+                    _result('a'),
                 ),
             ),
         ]):
@@ -24,9 +44,9 @@ class LiteralTest(unittest.TestCase):
                 self.assertEqual(Literal(Char('a'))(state), expected)
 
     def test_call_fail(self):
-        for state in list[State]([
-            State(),
-            State.load('b'),
+        for state in list[CharStream]([
+            _state(),
+            _state('b'),
         ]):
             with self.subTest(state=state):
                 with self.assertRaises(Error):
@@ -35,19 +55,19 @@ class LiteralTest(unittest.TestCase):
 
 class AndTest(unittest.TestCase):
     def test_call(self):
-        for state, expected in list[tuple[State, StateAndResult]]([
+        for state, expected in list[tuple[CharStream, StateAndResult]]([
             (
-                State.load('ab'),
+                _state('ab'),
                 (
-                    State(),
-                    Result('ab'),
+                    _state(),
+                    _result('ab'),
                 ),
             ),
             (
-                State.load('abc'),
+                _state('abc'),
                 (
-                    State.load('c'),
-                    Result('ab'),
+                    _state('c'),
+                    _result('ab'),
                 ),
             ),
         ]):
@@ -58,10 +78,10 @@ class AndTest(unittest.TestCase):
                 )
 
     def test_call_fail(self):
-        for state in list[State]([
-            State(),
-            State.load('b'),
-            State.load('ac'),
+        for state in list[CharStream]([
+            _state(),
+            _state('b'),
+            _state('ac'),
         ]):
             with self.subTest(state=state):
                 with self.assertRaises(Error):
@@ -70,33 +90,33 @@ class AndTest(unittest.TestCase):
 
 class OrTest(unittest.TestCase):
     def test_call(self):
-        for state, expected in list[tuple[State, StateAndResult]]([
+        for state, expected in list[tuple[CharStream, StateAndResult]]([
             (
-                State.load('a'),
+                _state('a'),
                 (
-                    State(),
-                    Result('a'),
+                    _state(),
+                    _result('a'),
                 ),
             ),
             (
-                State.load('b'),
+                _state('b'),
                 (
-                    State(),
-                    Result('b'),
+                    _state(),
+                    _result('b'),
                 ),
             ),
             (
-                State.load('ac'),
+                _state('ac'),
                 (
-                    State.load('c'),
-                    Result('a'),
+                    _state('c'),
+                    _result('a'),
                 ),
             ),
             (
-                State.load('bc'),
+                _state('bc'),
                 (
-                    State.load('c'),
-                    Result('b'),
+                    _state('c'),
+                    _result('b'),
                 ),
             ),
         ]):
@@ -107,9 +127,9 @@ class OrTest(unittest.TestCase):
                 )
 
     def test_call_fail(self):
-        for state in list[State]([
-            State(),
-            State.load('c'),
+        for state in list[CharStream]([
+            _state(),
+            _state('c'),
         ]):
             with self.subTest(state=state):
                 with self.assertRaises(Error):
@@ -118,40 +138,40 @@ class OrTest(unittest.TestCase):
 
 class ZeroOrMoreTest(unittest.TestCase):
     def test_call(self):
-        for state, expected in list[tuple[State, StateAndResult]]([
+        for state, expected in list[tuple[CharStream, StateAndResult]]([
             (
-                State(),
+                _state(),
                 (
-                    State(),
-                    Result(),
+                    _state(),
+                    _result(),
                 )
             ),
             (
-                State.load('a'),
+                _state('a'),
                 (
-                    State(),
-                    Result('a'),
+                    _state(),
+                    _result('a'),
                 ),
             ),
             (
-                State.load('aa'),
+                _state('aa'),
                 (
-                    State(),
-                    Result('aa'),
+                    _state(),
+                    _result('aa'),
                 ),
             ),
             (
-                State.load('b'),
+                _state('b'),
                 (
-                    State.load('b'),
-                    Result(''),
+                    _state('b'),
+                    _result(''),
                 ),
             ),
             (
-                State.load('aab'),
+                _state('aab'),
                 (
-                    State.load('b'),
-                    Result('aa'),
+                    _state('b'),
+                    _result('aa'),
                 ),
             ),
         ]):
@@ -164,26 +184,26 @@ class ZeroOrMoreTest(unittest.TestCase):
 
 class OneOrMoreTest(unittest.TestCase):
     def test_call(self):
-        for state, expected in list[tuple[State, StateAndResult]]([
+        for state, expected in list[tuple[CharStream, StateAndResult]]([
             (
-                State.load('a'),
+                _state('a'),
                 (
-                    State(),
-                    Result('a'),
+                    _state(),
+                    _result('a'),
                 ),
             ),
             (
-                State.load('aa'),
+                _state('aa'),
                 (
-                    State(),
-                    Result('aa'),
+                    _state(),
+                    _result('aa'),
                 ),
             ),
             (
-                State.load('aab'),
+                _state('aab'),
                 (
-                    State.load('b'),
-                    Result('aa'),
+                    _state('b'),
+                    _result('aa'),
                 ),
             ),
         ]):
@@ -194,9 +214,9 @@ class OneOrMoreTest(unittest.TestCase):
                 )
 
     def test_call_fail(self):
-        for state in list[State]([
-            State(),
-            State.load('b'),
+        for state in list[CharStream]([
+            _state(),
+            _state('b'),
         ]):
             with self.subTest(state=state):
                 with self.assertRaises(Error):
@@ -205,33 +225,33 @@ class OneOrMoreTest(unittest.TestCase):
 
 class ZeroOrOneTest(unittest.TestCase):
     def test_call(self):
-        for state, expected in list[tuple[State, StateAndResult]]([
+        for state, expected in list[tuple[CharStream, StateAndResult]]([
             (
-                State(),
+                _state(),
                 (
-                    State(),
-                    Result(),
+                    _state(),
+                    _result(),
                 )
             ),
             (
-                State.load('a'),
+                _state('a'),
                 (
-                    State(),
-                    Result('a'),
+                    _state(),
+                    _result('a'),
                 ),
             ),
             (
-                State.load('b'),
+                _state('b'),
                 (
-                    State.load('b'),
-                    Result(''),
+                    _state('b'),
+                    _result(''),
                 ),
             ),
             (
-                State.load('ab'),
+                _state('ab'),
                 (
-                    State.load('b'),
-                    Result('a'),
+                    _state('b'),
+                    _result('a'),
                 ),
             ),
         ]):
@@ -244,26 +264,26 @@ class ZeroOrOneTest(unittest.TestCase):
 
 class UntilEmptyTest(unittest.TestCase):
     def test_call(self):
-        for state, expected in list[tuple[State, StateAndResult]]([
+        for state, expected in list[tuple[CharStream, StateAndResult]]([
             (
-                State(),
+                _state(),
                 (
-                    State(),
-                    Result(),
+                    _state(),
+                    _result(),
                 ),
             ),
             (
-                State.load('a'),
+                _state('a'),
                 (
-                    State(),
-                    Result('a'),
+                    _state(),
+                    _result('a'),
                 ),
             ),
             (
-                State.load('aa'),
+                _state('aa'),
                 (
-                    State(),
-                    Result('aa'),
+                    _state(),
+                    _result('aa'),
                 ),
             ),
         ]):
@@ -274,8 +294,8 @@ class UntilEmptyTest(unittest.TestCase):
                 )
 
     def test_call_fail(self):
-        for state in list[State]([
-            State.load('b'),
+        for state in list[CharStream]([
+            _state('b'),
         ]):
             with self.subTest(state=state):
                 with self.assertRaises(Error):
