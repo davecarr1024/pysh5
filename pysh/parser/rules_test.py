@@ -5,8 +5,8 @@ from .rules import *
 class Val:
     @classmethod
     @abstractmethod
-    def load(cls, scope: Scope['Val'], state: TokenStream) -> StateAndResult['Val']:
-        return Or([Int.load, Str.load])(scope, state)
+    def load(cls, state: TokenStream, scope: Scope['Val']) -> StateAndResult['Val']:
+        return Or([Int.load, Str.load])(state, scope)
 
 
 @dataclass(frozen=True)
@@ -14,9 +14,9 @@ class Int(Val):
     val: int
 
     @classmethod
-    def load(cls, scope: Scope[Val], state: TokenStream) -> StateAndResult['Val']:
+    def load(cls, state: TokenStream, scope: Scope[Val]) -> StateAndResult['Val']:
         try:
-            return Literal[Val]('int', lambda token: Int(int(token.val)))(scope, state)
+            return Literal[Val]('int', lambda token: Int(int(token.val)))(state, scope)
         except ValueError as error:
             raise StateError(state=state, children=[],
                              msg=f'invalid value: {error}')
@@ -27,8 +27,8 @@ class Str(Val):
     val: str
 
     @classmethod
-    def load(cls, scope: Scope[Val], state: TokenStream) -> StateAndResult['Val']:
-        return Literal[Val]('str', lambda token: Str(token.val))(scope, state)
+    def load(cls, state: TokenStream, scope: Scope[Val]) -> StateAndResult['Val']:
+        return Literal[Val]('str', lambda token: Str(token.val))(state, scope)
 
 
 class LiteralTest(TestCase):
@@ -47,7 +47,7 @@ class LiteralTest(TestCase):
             ),
         ]):
             with self.subTest(state=state, expected=expected):
-                self.assertEqual(Int.load(Scope[Val](), state), expected)
+                self.assertEqual(Int.load(state, Scope[Val]()), expected)
 
     def test_load_fail(self):
         for state in list[TokenStream]([
@@ -57,7 +57,7 @@ class LiteralTest(TestCase):
         ]):
             with self.subTest(state=state):
                 with self.assertRaises(Error):
-                    Int.load(Scope[Val](), state)
+                    Int.load(state, Scope[Val]())
 
 
 class RefTest(TestCase):
@@ -78,10 +78,10 @@ class RefTest(TestCase):
             with self.subTest(state=state, expected=expected):
                 self.assertEqual(
                     Ref('a')(
+                        state,
                         Scope[Val]({
                             'a': Int.load,
                         }),
-                        state,
                     ), expected)
 
     def test_load_fail(self):
@@ -93,10 +93,10 @@ class RefTest(TestCase):
             with self.subTest(state=state):
                 with self.assertRaises(Error):
                     Ref('a')(
+                        state,
                         Scope[Val]({
                             'a': Int.load,
                         }),
-                        state,
                     )
 
 
@@ -133,7 +133,7 @@ class AndTest(TestCase):
         ]):
             with self.subTest(state=state, expected=expected):
                 self.assertEqual(
-                    And([Int.load, Int.load])(Scope[Val](), state),
+                    And([Int.load, Int.load])(state, Scope[Val]()),
                     expected
                 )
 
@@ -145,7 +145,7 @@ class AndTest(TestCase):
         ]):
             with self.subTest(state=state):
                 with self.assertRaises(Error):
-                    And([Int.load, Int.load])(Scope[Val](), state)
+                    And([Int.load, Int.load])(state, Scope[Val]())
 
 
 class OrTest(TestCase):
@@ -192,7 +192,7 @@ class OrTest(TestCase):
         ]):
             with self.subTest(state=state, expected=expected):
                 self.assertEqual(
-                    Val.load(Scope[Val](), state),
+                    Val.load(state, Scope[Val]()),
                     expected
                 )
 
@@ -203,7 +203,7 @@ class OrTest(TestCase):
         ]):
             with self.subTest(state=state):
                 with self.assertRaises(Error):
-                    Val.load(Scope[Val](), state)
+                    Val.load(state, Scope[Val]())
 
 
 class ZeroOrMoreTest(TestCase):
@@ -287,7 +287,7 @@ class ZeroOrMoreTest(TestCase):
         ]):
             with self.subTest(state=state, expected=expected):
                 self.assertEqual(
-                    ZeroOrMore(Int.load)(Scope[Val](), state),
+                    ZeroOrMore(Int.load)(state, Scope[Val]()),
                     expected
                 )
 
@@ -352,7 +352,7 @@ class OneOrMoreTest(TestCase):
         ]):
             with self.subTest(state=state, expected=expected):
                 self.assertEqual(
-                    OneOrMore(Int.load)(Scope[Val](), state),
+                    OneOrMore(Int.load)(state, Scope[Val]()),
                     expected
                 )
 
@@ -363,7 +363,7 @@ class OneOrMoreTest(TestCase):
         ]):
             with self.subTest(state=state):
                 with self.assertRaises(Error):
-                    OneOrMore(Int.load)(Scope[Val](), state)
+                    OneOrMore(Int.load)(state, Scope[Val]())
 
 
 class ZeroOrOneTest(TestCase):
@@ -412,7 +412,7 @@ class ZeroOrOneTest(TestCase):
         ]):
             with self.subTest(state=state, expected=expected):
                 self.assertEqual(
-                    ZeroOrOne(Int.load)(Scope[Val](), state),
+                    ZeroOrOne(Int.load)(state, Scope[Val]()),
                     expected
                 )
 
@@ -456,7 +456,7 @@ class UntilEmptyTest(TestCase):
         ]):
             with self.subTest(state=state, expected=expected):
                 self.assertEqual(
-                    UntilEmpty(Int.load)(Scope[Val](), state),
+                    UntilEmpty(Int.load)(state, Scope[Val]()),
                     expected
                 )
 
@@ -472,4 +472,44 @@ class UntilEmptyTest(TestCase):
         ]):
             with self.subTest(state=state):
                 with self.assertRaises(Error):
-                    UntilEmpty(Int.load)(Scope[Val](), state)
+                    UntilEmpty(Int.load)(state, Scope[Val]())
+
+
+class ParserTest(TestCase):
+    def test_load(self):
+        for state, expected in list[tuple[TokenStream, StateAndResult[Int]]]([
+            (
+                TokenStream([Token('int', '1')]),
+                (TokenStream(), Int(1)),
+            ),
+            (
+                TokenStream([
+                    Token('int', '1'),
+                    Token('int', '2'),
+                ]),
+                (TokenStream([Token('int', '2')]), Int(1)),
+            ),
+        ]):
+            with self.subTest(state=state, expected=expected):
+                self.assertEqual(
+                    Parser(
+                        'a',
+                        Scope[Val]({
+                            'a': Int.load,
+                        }),
+                    )(state), expected)
+
+    def test_load_fail(self):
+        for state in list[TokenStream]([
+            TokenStream(),
+            TokenStream([Token('float', '3.14')]),
+            TokenStream([Token('int', 'abc')]),
+        ]):
+            with self.subTest(state=state):
+                with self.assertRaises(Error):
+                    Parser(
+                        'a',
+                        Scope[Val]({
+                            'a': Int.load,
+                        }),
+                    )(state)
