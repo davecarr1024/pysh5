@@ -218,7 +218,12 @@ class Parser(AbstractRule[_Result]):
     root_rule_name: str
     scope: Scope[_Result]
 
-    def __call__(self, state: TokenStream, scope: Optional[Scope[_Result]] = None, rule_name: Optional[str] = None) -> StateAndResult[_Result]:
+    def __call__(
+            self,
+            state: TokenStream,
+            scope: Optional[Scope[_Result]] = None,
+            rule_name: Optional[str] = None,
+    ) -> StateAndResult[_Result]:
         scope = scope or self.scope
         rule_name = rule_name or self.root_rule_name
         if rule_name not in scope:

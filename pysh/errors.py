@@ -5,3 +5,6 @@ from typing import Optional
 @dataclass(frozen=True, kw_only=True)
 class Error(Exception):
     msg: Optional[str] = None
+
+    def __str__(self) -> str:
+        return self.msg or ''
