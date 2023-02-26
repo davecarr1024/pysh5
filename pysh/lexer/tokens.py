@@ -50,3 +50,15 @@ class TokenStream(Sized, Iterable[Token]):
         if not self:
             raise Error(msg='tail from empty tokenstream')
         return TokenStream(self.tokens[1:])
+
+    def pop(self, rule_name: str) -> 'TokenStream':
+        stream, _ = self.pop_val(rule_name)
+        return stream
+
+    def pop_val(self, rule_name: str) -> tuple['TokenStream', str]:
+        if not self:
+            raise Error(msg='pop empty token stream')
+        if self.head().rule_name != rule_name:
+            raise Error(
+                msg=f'popping token stream got head {self.head().rule_name} expected {rule_name}')
+        return self.tail(), self.head().val

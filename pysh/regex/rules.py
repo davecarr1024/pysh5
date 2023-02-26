@@ -6,11 +6,11 @@ from .. import errors
 from .chars import *
 
 
-@dataclass(frozen=True)
-class RuleError(errors.Error):
-    children: Sequence[errors.Error]
+@dataclass(frozen=True, kw_only=True)
+class RuleError(Error):
     state: 'CharStream'
     rule: 'Rule'
+    children: Sequence[Error] = field(default_factory=list[Error])
 
 
 @dataclass(frozen=True)
@@ -37,12 +37,44 @@ class Rule(ABC):
 
 
 @dataclass(frozen=True)
+class Any(Rule):
+    def __call__(self, state: CharStream) -> StateAndResult:
+        return state.tail(), Result([state.head()])
+
+
+@dataclass(frozen=True)
+class Class(Rule):
+    start: str
+    end: str
+
+    def __call__(self, state: CharStream) -> StateAndResult:
+        if state.head().val >= self.start and state.head().val <= self.end:
+            return state.tail(), Result([state.head()])
+        raise RuleError(rule=self, state=state)
+
+
+@dataclass(frozen=True)
+class UnaryRule(Rule):
+    child: Rule
+
+
+@dataclass(frozen=True)
+class Not(UnaryRule):
+    def __call__(self, state: CharStream) -> StateAndResult:
+        try:
+            _ = self.child(state)
+            raise RuleError(rule=self, state=state)
+        except Error:
+            return state.tail(), Result([state.head()])
+
+
+@dataclass(frozen=True)
 class Literal(Rule):
     val: Char
 
     def __call__(self, state: CharStream) -> StateAndResult:
         if state.head() != self.val:
-            raise RuleError(msg=None, state=state, rule=self, children=[])
+            raise RuleError(rule=self, state=state)
         return state.tail(), Result([state.head()])
 
 
@@ -78,9 +110,7 @@ class Or(Rule):
 
 
 @dataclass(frozen=True)
-class ZeroOrMore(Rule):
-    child: Rule
-
+class ZeroOrMore(UnaryRule):
     def __call__(self, state: CharStream) -> StateAndResult:
         result = Result()
         while True:
@@ -92,9 +122,7 @@ class ZeroOrMore(Rule):
 
 
 @dataclass(frozen=True)
-class OneOrMore(Rule):
-    child: Rule
-
+class OneOrMore(UnaryRule):
     def __call__(self, state: CharStream) -> StateAndResult:
         try:
             state, result = self.child(state)
@@ -109,9 +137,7 @@ class OneOrMore(Rule):
 
 
 @dataclass(frozen=True)
-class ZeroOrOne(Rule):
-    child: Rule
-
+class ZeroOrOne(UnaryRule):
     def __call__(self, state: CharStream) -> StateAndResult:
         try:
             return self.child(state)
@@ -120,9 +146,7 @@ class ZeroOrOne(Rule):
 
 
 @dataclass(frozen=True)
-class UntilEmpty(Rule):
-    child: Rule
-
+class UntilEmpty(UnaryRule):
     def __call__(self, state: CharStream) -> StateAndResult:
         result = Result()
         while state:

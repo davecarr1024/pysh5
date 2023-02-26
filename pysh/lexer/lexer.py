@@ -1,4 +1,4 @@
-from typing import Mapping
+from typing import OrderedDict
 from .tokens import *
 from .. import regex
 
@@ -11,7 +11,7 @@ class LexError(Error):
 
 @dataclass(frozen=True)
 class Lexer:
-    rules: Mapping[str, regex.Rule]
+    rules: OrderedDict[str, regex.Rule]
 
     def _apply_any(self, state: CharStream) -> tuple[CharStream, Token]:
         rule_errors: MutableSequence[Error] = []
@@ -21,7 +21,7 @@ class Lexer:
                 return state, Token.load(rule_name, result)
             except Error as error:
                 rule_errors.append(error)
-        raise LexError(state, rule_errors)
+        raise LexError(state, rule_errors, msg='failed to apply any rules')
 
     def __call__(self, state: CharStream | str) -> TokenStream:
         if isinstance(state, str):

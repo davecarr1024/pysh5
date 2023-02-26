@@ -20,7 +20,7 @@ class CharStreamTest(unittest.TestCase):
             (CharStream([Char('a')]), True)
         ]):
             with self.subTest(state=state, expected=expected):
-                self.assertEquals(bool(state), expected)
+                self.assertEqual(bool(state), expected)
 
     def test_head(self):
         for state, expected in list[tuple[CharStream, Char]]([

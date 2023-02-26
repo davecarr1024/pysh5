@@ -7,10 +7,12 @@ from ..errors import *
 _Result = TypeVar('_Result')
 
 
-@dataclass(frozen=True, kw_only=True)
-class StateError(Error):
+@dataclass(frozen=True, kw_only=True, repr=False)
+class StateError(NaryError):
     state: TokenStream
-    children: Sequence[Error] = field(default_factory=list[Error])
+
+    def _repr(self) -> str:
+        return f"StateError(state={self.state},msg={self.msg})"
 
 
 StateAndResult = tuple[TokenStream, _Result]
@@ -39,9 +41,12 @@ class AbstractRule(Generic[_Result], ABC):
         ...
 
 
-@dataclass(frozen=True, kw_only=True)
+@dataclass(frozen=True, kw_only=True, repr=False)
 class RuleError(Generic[_Result], StateError):
     rule: Rule[_Result]
+
+    def _repr(self) -> str:
+        return f"RuleError(rule={str(self.rule)},state={self.state},msg={self.msg})"
 
 
 StateAndMultipleResult = tuple[TokenStream, Sequence[_Result]]
@@ -56,9 +61,12 @@ class AbstractMultipleResultRule(Generic[_Result], ABC):
         ...
 
 
-@dataclass(frozen=True, kw_only=True)
+@dataclass(frozen=True, kw_only=True, repr=False)
 class MultipleResultRuleError(Generic[_Result], StateError):
     rule: MultipleResultRule[_Result]
+
+    def _repr(self) -> str:
+        return f"MultipleResultRuleError(rule={str(self.rule)},state={self.state},msg={self.msg})"
 
 
 StateAndOptionalResult = tuple[TokenStream, Optional[_Result]]
@@ -76,6 +84,9 @@ class AbstractOptionalResultRule(Generic[_Result], ABC):
 @dataclass(frozen=True)
 class AbstractLiteral(AbstractRule[_Result]):
     rule_name: str
+
+    def __str__(self) -> str:
+        return self.rule_name
 
     @abstractmethod
     def convert_result(self, token: Token) -> _Result:
@@ -104,6 +115,9 @@ class Literal(AbstractLiteral[_Result]):
 class Ref(AbstractRule[_Result]):
     rule_name: str
 
+    def __str__(self) -> str:
+        return self.rule_name
+
     def __call__(self, state: TokenStream, scope: Scope[_Result]) -> StateAndResult[_Result]:
         if self.rule_name not in scope:
             raise RuleError(
@@ -121,6 +135,9 @@ class Ref(AbstractRule[_Result]):
 class And(AbstractMultipleResultRule[_Result]):
     children: Sequence[Rule[_Result]]
 
+    def __str__(self) -> str:
+        return f"({' '.join(str(child)for child in self.children)})"
+
     def __call__(self, state: TokenStream, scope: Scope[_Result]) -> StateAndMultipleResult[_Result]:
         results: MutableSequence[_Result] = []
         for child in self.children:
@@ -137,6 +154,9 @@ class And(AbstractMultipleResultRule[_Result]):
 class Or(AbstractRule[_Result]):
     children: Sequence[Rule[_Result]]
 
+    def __str__(self) -> str:
+        return f"({' | '.join(str(child)for child in self.children)})"
+
     def __call__(self, state: TokenStream, scope: Scope[_Result]) -> StateAndResult[_Result]:
         child_errors: MutableSequence[Error] = []
         for child in self.children:
@@ -151,6 +171,9 @@ class Or(AbstractRule[_Result]):
 class ZeroOrMore(AbstractMultipleResultRule[_Result]):
     child: Rule[_Result]
 
+    def __str__(self) -> str:
+        return f'{self.child}*'
+
     def __call__(self, state: TokenStream, scope: Scope[_Result]) -> StateAndMultipleResult[_Result]:
         results: MutableSequence[_Result] = []
         while True:
@@ -164,6 +187,9 @@ class ZeroOrMore(AbstractMultipleResultRule[_Result]):
 @dataclass(frozen=True)
 class OneOrMore(AbstractMultipleResultRule[_Result]):
     child: Rule[_Result]
+
+    def __str__(self) -> str:
+        return f'{self.child}+'
 
     def __call__(self, state: TokenStream, scope: Scope[_Result]) -> StateAndMultipleResult[_Result]:
         try:
@@ -187,6 +213,9 @@ class OneOrMore(AbstractMultipleResultRule[_Result]):
 class ZeroOrOne(AbstractOptionalResultRule[_Result]):
     child: Rule[_Result]
 
+    def __str__(self) -> str:
+        return f'{self.child}?'
+
     def __call__(self, state: TokenStream, scope: Scope[_Result]) -> StateAndOptionalResult[_Result]:
         try:
             return self.child(state, scope)
@@ -197,6 +226,9 @@ class ZeroOrOne(AbstractOptionalResultRule[_Result]):
 @dataclass(frozen=True)
 class UntilEmpty(AbstractMultipleResultRule[_Result]):
     child: Rule[_Result]
+
+    def __str__(self) -> str:
+        return f'{self.child}!'
 
     def __call__(self, state: TokenStream, scope: Scope[_Result]) -> StateAndMultipleResult[_Result]:
         results: MutableSequence[_Result] = []
