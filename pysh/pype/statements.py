@@ -48,6 +48,15 @@ class Block(Statement):
 
 
 @dataclass(frozen=True)
+class ExprStatement(Statement):
+    val: Expr
+
+    def eval(self, scope: Scope) -> Statement.Result:
+        self.val.eval(scope)
+        return Statement.Result()
+
+
+@dataclass(frozen=True)
 class Assignment(Statement):
     ref: Ref
     val: Expr

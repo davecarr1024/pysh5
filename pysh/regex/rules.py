@@ -78,6 +78,12 @@ class Literal(Rule):
         return state.tail(), Result([state.head()])
 
 
+def literal(value: str) -> Rule:
+    if len(value) == 1:
+        return Literal(Char(value))
+    return And([Literal(Char(c)) for c in value])
+
+
 @dataclass(frozen=True)
 class And(Rule):
     children: Sequence[Rule]

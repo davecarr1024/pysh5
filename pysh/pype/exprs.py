@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from typing import MutableSequence
+from typing import MutableSequence, Type
 from .vals import *
 from ..errors import *
 
@@ -8,6 +8,14 @@ class Expr(ABC):
     @abstractmethod
     def eval(self, scope: Scope) -> Val:
         ...
+
+    @classmethod
+    def types(cls) -> Sequence[Type['Expr']]:
+        return [
+            Expr,
+            Literal,
+            Ref,
+        ]
 
 
 @dataclass(frozen=True)

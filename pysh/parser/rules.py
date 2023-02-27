@@ -245,6 +245,82 @@ class UntilEmpty(AbstractMultipleResultRule[_Result]):
         return state, results
 
 
+_PartResult = TypeVar('_PartResult')
+
+
+@dataclass(frozen=True)
+class _AbstractFormat(Generic[_Result], Sized, Iterable[OptionalResultRule[_Result]]):
+    class Part(AbstractOptionalResultRule[_PartResult]):
+        ...
+
+    @dataclass(frozen=True)
+    class Pop(Part[_PartResult]):
+        rule_name: str
+
+        def __call__(self, state: TokenStream, scope: Scope[_PartResult]) -> StateAndOptionalResult[_PartResult]:
+            return state.pop(self.rule_name), None
+
+    @dataclass(frozen=True)
+    class Apply(Part[_PartResult]):
+        child: Rule[_PartResult]
+
+        def __call__(self, state: TokenStream, scope: Scope[_PartResult]) -> StateAndOptionalResult[_PartResult]:
+            return self.child(state, scope)
+
+    parts: Sequence[Part[_Result]]
+
+    def __len__(self) -> int:
+        return len(self.parts)
+
+    def __iter__(self) -> Iterator[OptionalResultRule[_Result]]:
+        return iter(self.parts)
+
+    def _apply_parts(self, state: TokenStream, scope: Scope[_Result]) -> StateAndMultipleResult[_Result]:
+        results: MutableSequence[_Result] = []
+        for part in self.parts:
+            state, result = part(state, scope)
+            if result:
+                results.append(result)
+        return state, results
+
+
+@dataclass(frozen=True)
+class Format(_AbstractFormat[_Result], AbstractRule[_Result]):
+    def __call__(self, state: TokenStream, scope: Scope[_Result]) -> StateAndResult[_Result]:
+        state, results = self._apply_parts(state, scope)
+        if len(results) != 1:
+            raise RuleError(
+                rule=self,
+                state=state,
+                msg=f'expected 1 format result got {len(results)}'
+            )
+        return state, results[0]
+
+
+def _format_parts(*parts: str | Rule[_Result]) -> Sequence[_AbstractFormat.Part[_Result]]:
+    parts_: MutableSequence[_AbstractFormat.Part[_Result]] = []
+    for part in parts:
+        if isinstance(part, str):
+            parts_.append(_AbstractFormat.Pop(part))
+        else:
+            parts_.append(_AbstractFormat.Apply(part))
+    return parts_
+
+
+def format(*parts: str | Rule[_Result]) -> Format[_Result]:
+    return Format[_Result](_format_parts(*parts))
+
+
+@dataclass(frozen=True)
+class MultipleResultFormat(_AbstractFormat[_Result], AbstractMultipleResultRule[_Result]):
+    def __call__(self, state: TokenStream, scope: Scope[_Result]) -> StateAndMultipleResult[_Result]:
+        return self._apply_parts(state, scope)
+
+
+def multiple_result_format(*parts: str | Rule[_Result]) -> MultipleResultFormat[_Result]:
+    return MultipleResultFormat[_Result](_format_parts(*parts))
+
+
 @dataclass(frozen=True)
 class Parser(AbstractRule[_Result]):
     root_rule_name: str

@@ -1,27 +1,64 @@
-from typing import OrderedDict
 from .tokens import *
 from .. import regex
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, kw_only=True)
 class LexError(Error):
     state: CharStream
     children: Sequence[Error]
 
 
-@dataclass(frozen=True)
-class Lexer:
-    rules: OrderedDict[str, regex.Rule]
+@dataclass(frozen=True, kw_only=True)
+class RuleError(UnaryError):
+    rule: 'Rule'
 
-    def _apply_any(self, state: CharStream) -> tuple[CharStream, Token]:
-        rule_errors: MutableSequence[Error] = []
-        for rule_name, rule in self.rules.items():
+
+StateAndResult = tuple[CharStream, Token]
+
+
+@dataclass(frozen=True)
+class Rule:
+    name: str
+    regex_: regex.Rule
+
+    def __call__(self, state: CharStream | str) -> StateAndResult:
+        if isinstance(state, str):
+            return self(CharStream.load(state))
+        try:
+            state, result = self.regex_(state)
+            return state, Token.load(self.name, result)
+        except Error as error:
+            raise RuleError(
+                rule=self,
+                child=error,
+            )
+
+    @staticmethod
+    def literal(value: str) -> 'Rule':
+        return Rule(value, regex.literal(value))
+
+
+@dataclass(frozen=True)
+class Lexer(Sized, Iterable[Rule]):
+    rules: Sequence[Rule]
+
+    def __len__(self) -> int:
+        return len(self.rules)
+
+    def __iter__(self) -> Iterator[Rule]:
+        return iter(self.rules)
+
+    def _apply_any(self, state: CharStream) -> StateAndResult:
+        errors: MutableSequence[Error] = []
+        for rule in self.rules:
             try:
-                state, result = rule(state)
-                return state, Token.load(rule_name, result)
+                return rule(state)
             except Error as error:
-                rule_errors.append(error)
-        raise LexError(state, rule_errors, msg='failed to apply any rules')
+                errors.append(error)
+        raise LexError(
+            state=state,
+            children=errors,
+        )
 
     def __call__(self, state: CharStream | str) -> TokenStream:
         if isinstance(state, str):

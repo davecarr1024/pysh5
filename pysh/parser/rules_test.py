@@ -513,3 +513,136 @@ class ParserTest(TestCase):
                             'a': Int.load,
                         }),
                     )(state)
+
+
+class FormatTest(TestCase):
+    def test_call(self):
+        for format_, state, expected in list[tuple[Format[Val], TokenStream, StateAndResult[Val]]]([
+            (
+                format(Int.load),
+                TokenStream([
+                    Token('int', '1'),
+                ]),
+                (
+                    TokenStream(),
+                    Int(1),
+                )
+            ),
+            (
+                format('(', Int.load, ')'),
+                TokenStream([
+                    Token('(', '('),
+                    Token('int', '1'),
+                    Token(')', ')'),
+                ]),
+                (
+                    TokenStream(),
+                    Int(1),
+                )
+            ),
+        ]):
+            with self.subTest(format=format_, state=state, expected=expected):
+                self.assertEqual(format_(state, Scope[Val]()), expected)
+
+    def test_call_fail(self):
+        for format_, state in list[tuple[Format[Val], TokenStream]]([
+            (
+                format('(', Int.load, ')'),
+                TokenStream([
+                ]),
+            ),
+            (
+                format('(', Int.load, ')'),
+                TokenStream([
+                    Token('(', '('),
+                ]),
+            ),
+            (
+                format('(', Int.load, ')'),
+                TokenStream([
+                    Token('(', '('),
+                    Token('int', '1'),
+                ]),
+            ),
+            (
+                format('(', Int.load, ')'),
+                TokenStream([
+                ]),
+            ),
+            (
+                format('(', Int.load, ')'),
+                TokenStream([
+                    Token('(', '('),
+                ]),
+            ),
+            (
+                format('(', Int.load, ')'),
+                TokenStream([
+                    Token('int', '1'),
+                ]),
+            ),
+            (
+                format('(', Int.load, ')'),
+                TokenStream([
+                    Token('int', '1'),
+                ]),
+            ),
+            (
+                format(Int.load, Int.load),
+                TokenStream([
+                    Token('int', '1'),
+                    Token('int', '2'),
+                ]),
+            ),
+        ]):
+            with self.subTest(format_=format_, state=state):
+                with self.assertRaises(Error):
+                    format_(state, Scope[Val]())
+
+
+class MultipleFormatTest(TestCase):
+    def test_call(self):
+        for format_, state, expected in list[tuple[MultipleResultFormat[Val], TokenStream, StateAndMultipleResult[Val]]]([
+            (
+                multiple_result_format(Int.load, '-', Int.load),
+                TokenStream([
+                    Token('int', '1'),
+                    Token('-', '-'),
+                    Token('int', '2'),
+                ]),
+                (
+                    TokenStream(),
+                    [
+                        Int(1),
+                        Int(2),
+                    ]
+                )
+            ),
+        ]):
+            with self.subTest(format=format_, state=state, expected=expected):
+                self.assertEqual(format_(state, Scope[Val]()), expected)
+
+    def test_call_fail(self):
+        for format_, state in list[tuple[MultipleResultFormat[Val], TokenStream]]([
+            (
+                multiple_result_format(Int.load, '-', Int.load),
+                TokenStream([
+                ]),
+            ),
+            (
+                multiple_result_format(Int.load, '-', Int.load),
+                TokenStream([
+                    Token('int', '1'),
+                ]),
+            ),
+            (
+                multiple_result_format(Int.load, '-', Int.load),
+                TokenStream([
+                    Token('int', '1'),
+                    Token('-', '-'),
+                ]),
+            ),
+        ]):
+            with self.subTest(format_=format_, state=state):
+                with self.assertRaises(Error):
+                    format_(state, Scope[Val]())

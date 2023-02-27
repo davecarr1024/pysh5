@@ -6,34 +6,42 @@ class LexerTest(TestCase):
     def test_call(self):
         for lexer, input, expected in list[tuple[Lexer, str, TokenStream]]([
             (
-                Lexer({
-                    'r': regex.Literal(Char('a')),
-                    's': regex.Literal(Char('b')),
-                }),
+                Lexer([
+                    Rule('r', regex.literal('a')),
+                    Rule('s', regex.literal('b')),
+                ]),
                 '',
                 TokenStream(),
             ),
             (
-                Lexer({
-                    'r': regex.Literal(Char('a')),
-                    's': regex.Literal(Char('b')),
-                }),
+                Lexer([
+                    Rule('r', regex.literal('a')),
+                    Rule('s', regex.literal('b')),
+                ]),
+                '',
+                TokenStream(),
+            ),
+            (
+                Lexer([
+                    Rule('r', regex.literal('a')),
+                    Rule('s', regex.literal('b')),
+                ]),
                 'a',
                 TokenStream([Token('r', 'a')]),
             ),
             (
-                Lexer({
-                    'r': regex.Literal(Char('a')),
-                    's': regex.Literal(Char('b')),
-                }),
+                Lexer([
+                    Rule('r', regex.literal('a')),
+                    Rule('s', regex.literal('b')),
+                ]),
                 'b',
                 TokenStream([Token('s', 'b')]),
             ),
             (
-                Lexer({
-                    'r': regex.Literal(Char('a')),
-                    's': regex.Literal(Char('b')),
-                }),
+                Lexer([
+                    Rule('r', regex.literal('a')),
+                    Rule('s', regex.literal('b')),
+                ]),
                 'ab',
                 TokenStream([Token('r', 'a'), Token('s', 'b')]),
             ),
@@ -44,10 +52,10 @@ class LexerTest(TestCase):
     def test_call_fail(self):
         for lexer, input in list[tuple[Lexer, str]]([
             (
-                Lexer({
-                    'r': regex.Literal(Char('a')),
-                    's': regex.Literal(Char('b')),
-                }),
+                Lexer([
+                    Rule('r', regex.literal('a')),
+                    Rule('s', regex.literal('b')),
+                ]),
                 'c',
             ),
         ]):

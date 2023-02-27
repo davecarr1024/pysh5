@@ -10,7 +10,7 @@ class Error(Exception):
         return repr(self)
 
     def __repr__(self) -> str:
-        return f'Error(msg={self.msg})'
+        return f'Error(msg={repr(self.msg)})'
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -26,3 +26,8 @@ class NaryError(Error):
 
     def __repr__(self) -> str:
         return self.__repr(0)
+
+
+@dataclass(frozen=True, kw_only=True)
+class UnaryError(Error):
+    child: Error
