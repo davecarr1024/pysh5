@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
-from typing import Iterable, Iterator, MutableSequence, Sequence, Sized
-from ..errors import *
+from typing import Iterable, Iterator, MutableSequence, Optional, Sequence, Sized
+from . import errors
 
 
 @dataclass(frozen=True)
@@ -19,14 +19,14 @@ class Position:
 class Char:
     val: str
     position: Position = field(
-        default_factory=Position, compare=False, repr=False)
+        default_factory=Position)
 
     def __str__(self) -> str:
         return self.val
 
     def __post_init__(self):
         if len(self.val) != 1:
-            raise Error(msg=f'invalid char {self}')
+            raise errors.Error(msg=f'invalid char {self}')
 
 
 @dataclass(frozen=True)
@@ -44,12 +44,12 @@ class CharStream(Sized, Iterable[Char]):
 
     def head(self) -> Char:
         if not self:
-            raise Error(msg='head of empty state')
+            raise errors.Error(msg='head of empty state')
         return self.chars[0]
 
     def tail(self) -> 'CharStream':
         if not self:
-            raise Error(msg='tail of empty state')
+            raise errors.Error(msg='tail of empty state')
         return CharStream(self.chars[1:])
 
     @staticmethod

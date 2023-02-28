@@ -1,19 +1,19 @@
-import unittest
+from unittest import TestCase
 from .chars import *
 
 
-class CharTest(unittest.TestCase):
+class CharTest(TestCase):
     def test_ctor(self):
         Char('a')
 
     def test_ctor_fail(self):
         for val in list[str](['', 'aa']):
             with self.subTest(val=val):
-                with self.assertRaises(Error):
+                with self.assertRaises(errors.Error):
                     Char(val)
 
 
-class CharStreamTest(unittest.TestCase):
+class CharStreamTest(TestCase):
     def test_bool(self):
         for state, expected in list[tuple[CharStream, bool]]([
             (CharStream(), False),
@@ -31,7 +31,7 @@ class CharStreamTest(unittest.TestCase):
                 self.assertEqual(state.head(), expected)
 
     def test_head_fail(self):
-        with self.assertRaises(Error):
+        with self.assertRaises(errors.Error):
             CharStream().head()
 
     def test_tail(self):
@@ -49,5 +49,5 @@ class CharStreamTest(unittest.TestCase):
                 self.assertEqual(state.tail(), expected)
 
     def test_tail_fail(self):
-        with self.assertRaises(Error):
+        with self.assertRaises(errors.Error):
             CharStream().tail()
