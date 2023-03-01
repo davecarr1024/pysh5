@@ -59,22 +59,18 @@ class Any(_AbstractRegex):
 
 @dataclass(frozen=True)
 class Literal(_AbstractRegex):
-    val: str
-
-    def __post_init__(self):
-        if len(self.val) != 1:
-            raise errors.Error(msg=f'invalid regex literal {self}')
+    val: chars.Char
 
     def __call__(self, state: chars.CharStream) -> StateAndResult:
-        if state.head().val != self.val:
+        if state.head() != self.val:
             raise RegexError(regex=self, state=state,
-                             msg=f'expected regex literal {repr(self.val)} got {state.head()}')
+                             msg=f'expected regex literal {self.val} got {state.head()}')
         return state.tail(), Result([state.head()])
 
 
 def literal(val: str) -> Regex:
     if len(val) == 1:
-        return Literal(val)
+        return Literal(chars.Char(val))
     return And([literal(c) for c in val])
 
 

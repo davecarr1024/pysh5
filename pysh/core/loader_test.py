@@ -30,6 +30,22 @@ class LoaderTest(TestCase):
                     regex.literal('b'),
                 ]),
             ),
+            (
+                'a*',
+                regex.ZeroOrMore(regex.literal('a')),
+            ),
+            (
+                'a+',
+                regex.OneOrMore(regex.literal('a')),
+            ),
+            (
+                'a?',
+                regex.ZeroOrOne(regex.literal('a')),
+            ),
+            (
+                'a!',
+                regex.UntilEmpty(regex.literal('a')),
+            ),
         ]):
             with self.subTest(input=input, expected=expected):
                 if expected is None:

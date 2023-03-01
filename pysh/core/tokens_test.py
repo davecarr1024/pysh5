@@ -1,3 +1,4 @@
+from typing import Optional, Sequence
 from unittest import TestCase
 from .tokens import *
 

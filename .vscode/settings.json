@@ -10,5 +10,9 @@
     "python.testing.unittestEnabled": true,
     "python.testing.pytestArgs": [
         "."
-    ]
+    ],
+    "python.linting.mypyEnabled": false,
+    "python.linting.enabled": true,
+    "python.linting.pylamaEnabled": true,
+    "python.languageServer": "Pylance"
 }

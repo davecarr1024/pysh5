@@ -140,7 +140,7 @@ class RegexTest(TestCase):
                 )
             ),
             (
-                Literal('a'),
+                literal('a'),
                 chars.CharStream.load('a'),
                 (
                     chars.CharStream(),
@@ -150,7 +150,7 @@ class RegexTest(TestCase):
                 )
             ),
             (
-                Literal('a'),
+                literal('a'),
                 chars.CharStream.load('ab'),
                 (
                     chars.CharStream.load('b', chars.Position(0, 1)),
@@ -160,12 +160,12 @@ class RegexTest(TestCase):
                 )
             ),
             (
-                Literal('a'),
+                literal('a'),
                 chars.CharStream.load('b'),
                 None
             ),
             (
-                And([Literal('a'), Literal('b')]),
+                And([literal('a'), literal('b')]),
                 chars.CharStream.load('ab'),
                 (
                     chars.CharStream(),
@@ -176,7 +176,7 @@ class RegexTest(TestCase):
                 )
             ),
             (
-                And([Literal('a'), Literal('b')]),
+                And([literal('a'), literal('b')]),
                 chars.CharStream.load('abc'),
                 (
                     chars.CharStream([
@@ -189,17 +189,17 @@ class RegexTest(TestCase):
                 )
             ),
             (
-                And([Literal('a'), Literal('b')]),
+                And([literal('a'), literal('b')]),
                 chars.CharStream.load('c'),
                 None
             ),
             (
-                And([Literal('a'), Literal('b')]),
+                And([literal('a'), literal('b')]),
                 chars.CharStream.load('b'),
                 None
             ),
             (
-                Or([Literal('a'), Literal('b')]),
+                Or([literal('a'), literal('b')]),
                 chars.CharStream.load('a'),
                 (
                     chars.CharStream(),
@@ -209,7 +209,7 @@ class RegexTest(TestCase):
                 )
             ),
             (
-                Or([Literal('a'), Literal('b')]),
+                Or([literal('a'), literal('b')]),
                 chars.CharStream.load('b'),
                 (
                     chars.CharStream(),
@@ -219,7 +219,7 @@ class RegexTest(TestCase):
                 )
             ),
             (
-                Or([Literal('a'), Literal('b')]),
+                Or([literal('a'), literal('b')]),
                 chars.CharStream.load('ac'),
                 (
                     chars.CharStream([
@@ -231,7 +231,7 @@ class RegexTest(TestCase):
                 )
             ),
             (
-                Or([Literal('a'), Literal('b')]),
+                Or([literal('a'), literal('b')]),
                 chars.CharStream.load('bc'),
                 (
                     chars.CharStream([
@@ -243,12 +243,12 @@ class RegexTest(TestCase):
                 )
             ),
             (
-                Or([Literal('a'), Literal('b')]),
+                Or([literal('a'), literal('b')]),
                 chars.CharStream.load('c'),
                 None
             ),
             (
-                ZeroOrMore(Literal('a')),
+                ZeroOrMore(literal('a')),
                 chars.CharStream.load(''),
                 (
                     chars.CharStream(),
@@ -257,7 +257,7 @@ class RegexTest(TestCase):
                 )
             ),
             (
-                ZeroOrMore(Literal('a')),
+                ZeroOrMore(literal('a')),
                 chars.CharStream.load('a'),
                 (
                     chars.CharStream(),
@@ -267,7 +267,7 @@ class RegexTest(TestCase):
                 )
             ),
             (
-                ZeroOrMore(Literal('a')),
+                ZeroOrMore(literal('a')),
                 chars.CharStream.load('aa'),
                 (
                     chars.CharStream(),
@@ -278,7 +278,7 @@ class RegexTest(TestCase):
                 )
             ),
             (
-                ZeroOrMore(Literal('a')),
+                ZeroOrMore(literal('a')),
                 chars.CharStream.load('b'),
                 (
                     chars.CharStream([
@@ -289,7 +289,7 @@ class RegexTest(TestCase):
                 )
             ),
             (
-                ZeroOrMore(Literal('a')),
+                ZeroOrMore(literal('a')),
                 chars.CharStream.load('ab'),
                 (
                     chars.CharStream([
@@ -301,7 +301,7 @@ class RegexTest(TestCase):
                 )
             ),
             (
-                ZeroOrMore(Literal('a')),
+                ZeroOrMore(literal('a')),
                 chars.CharStream.load('aab'),
                 (
                     chars.CharStream([
@@ -314,12 +314,12 @@ class RegexTest(TestCase):
                 )
             ),
             (
-                OneOrMore(Literal('a')),
+                OneOrMore(literal('a')),
                 chars.CharStream.load(''),
                 None
             ),
             (
-                OneOrMore(Literal('a')),
+                OneOrMore(literal('a')),
                 chars.CharStream.load('a'),
                 (
                     chars.CharStream(),
@@ -329,7 +329,7 @@ class RegexTest(TestCase):
                 )
             ),
             (
-                OneOrMore(Literal('a')),
+                OneOrMore(literal('a')),
                 chars.CharStream.load('aa'),
                 (
                     chars.CharStream(),
@@ -340,12 +340,12 @@ class RegexTest(TestCase):
                 )
             ),
             (
-                OneOrMore(Literal('a')),
+                OneOrMore(literal('a')),
                 chars.CharStream.load('b'),
                 None
             ),
             (
-                OneOrMore(Literal('a')),
+                OneOrMore(literal('a')),
                 chars.CharStream.load('ab'),
                 (
                     chars.CharStream([
@@ -357,7 +357,7 @@ class RegexTest(TestCase):
                 )
             ),
             (
-                OneOrMore(Literal('a')),
+                OneOrMore(literal('a')),
                 chars.CharStream.load('aab'),
                 (
                     chars.CharStream([
@@ -370,7 +370,7 @@ class RegexTest(TestCase):
                 )
             ),
             (
-                ZeroOrOne(Literal('a')),
+                ZeroOrOne(literal('a')),
                 chars.CharStream.load(''),
                 (
                     chars.CharStream(),
@@ -379,7 +379,7 @@ class RegexTest(TestCase):
                 )
             ),
             (
-                ZeroOrOne(Literal('a')),
+                ZeroOrOne(literal('a')),
                 chars.CharStream.load('a'),
                 (
                     chars.CharStream(),
@@ -389,7 +389,7 @@ class RegexTest(TestCase):
                 )
             ),
             (
-                ZeroOrOne(Literal('a')),
+                ZeroOrOne(literal('a')),
                 chars.CharStream.load('b'),
                 (
                     chars.CharStream([
@@ -400,7 +400,7 @@ class RegexTest(TestCase):
                 )
             ),
             (
-                ZeroOrOne(Literal('a')),
+                ZeroOrOne(literal('a')),
                 chars.CharStream.load('ab'),
                 (
                     chars.CharStream([
@@ -412,7 +412,7 @@ class RegexTest(TestCase):
                 )
             ),
             (
-                UntilEmpty(Literal('a')),
+                UntilEmpty(literal('a')),
                 chars.CharStream.load(''),
                 (
                     chars.CharStream(),
@@ -421,7 +421,7 @@ class RegexTest(TestCase):
                 )
             ),
             (
-                UntilEmpty(Literal('a')),
+                UntilEmpty(literal('a')),
                 chars.CharStream.load('a'),
                 (
                     chars.CharStream(),
@@ -431,7 +431,7 @@ class RegexTest(TestCase):
                 )
             ),
             (
-                UntilEmpty(Literal('a')),
+                UntilEmpty(literal('a')),
                 chars.CharStream.load('aa'),
                 (
                     chars.CharStream(),
@@ -442,17 +442,17 @@ class RegexTest(TestCase):
                 )
             ),
             (
-                UntilEmpty(Literal('a')),
+                UntilEmpty(literal('a')),
                 chars.CharStream.load('b'),
                 None
             ),
             (
-                UntilEmpty(Literal('a')),
+                UntilEmpty(literal('a')),
                 chars.CharStream.load('ab'),
                 None
             ),
             (
-                UntilEmpty(Literal('a')),
+                UntilEmpty(literal('a')),
                 chars.CharStream.load('aab'),
                 None
             ),
@@ -464,16 +464,7 @@ class RegexTest(TestCase):
                 else:
                     self.assertEqual(regex(state), expected)
 
-    def test_invalid_literal(self):
-        for val in list[str]([
-            '',
-            'ab',
-        ]):
-            with self.subTest(val=val):
-                with self.assertRaises(errors.Error):
-                    Literal(val)
-
-    def test_load_literal(self):
+    def test_loadliteral(self):
         for val, expected in list[tuple[str, Regex]]([
             (
                 '',
@@ -481,13 +472,13 @@ class RegexTest(TestCase):
             ),
             (
                 'a',
-                Literal('a'),
+                Literal(chars.Char('a')),
             ),
             (
                 'ab',
                 And([
-                    Literal('a'),
-                    Literal('b'),
+                    Literal(chars.Char('a')),
+                    Literal(chars.Char('b')),
                 ]),
             )
         ]):

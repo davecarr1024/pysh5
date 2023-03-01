@@ -8,7 +8,7 @@ class LexerTest(TestCase):
         for lexer, state, expected in list[tuple[Lexer, str, Optional[tokens.TokenStream]]]([
             (
                 Lexer([
-                    Rule('r', regex.Literal('a')),
+                    Rule('r', regex.literal('a')),
                 ]),
                 'aa',
                 tokens.TokenStream([
@@ -18,15 +18,15 @@ class LexerTest(TestCase):
             ),
             (
                 Lexer([
-                    Rule('r', regex.Literal('a')),
+                    Rule('r', regex.literal('a')),
                 ]),
                 'ab',
                 None
             ),
             (
                 Lexer([
-                    Rule('r', regex.Literal('a')),
-                    Rule('s', regex.Literal('b')),
+                    Rule('r', regex.literal('a')),
+                    Rule('s', regex.literal('b')),
                 ]),
                 'ab',
                 tokens.TokenStream([
@@ -36,8 +36,8 @@ class LexerTest(TestCase):
             ),
             (
                 Lexer([
-                    Rule('r', regex.Literal('a')),
-                    Rule('s', regex.Literal('b')),
+                    Rule('r', regex.literal('a')),
+                    Rule('s', regex.literal('b')),
                 ]),
                 'c',
                 None

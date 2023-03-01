@@ -36,15 +36,22 @@ def load_regex(input: str) -> regex.Regex:
 
     def load_postfix(operator: str, type: Type[regex.UnaryRegex]) -> parser.Rule[regex.Regex]:
         def inner(state: tokens.TokenStream, scope: parser.Scope[regex.Regex]) -> parser.StateAndResult[regex.Regex]:
-            state, rule = load_rule(state, scope)
+            state, rule = load_operand(state, scope)
             state, _ = state.pop(operator)
             return state, type(rule)
         return inner
 
     load_zero_or_more = load_postfix('*', regex.ZeroOrMore)
+    load_one_or_more = load_postfix('+', regex.OneOrMore)
+    load_zero_or_one = load_postfix('?', regex.ZeroOrOne)
+    load_until_empty = load_postfix('!', regex.UntilEmpty)
 
-    load_rule = parser.Or[regex.Regex](
-        [load_and, load_or, load_zero_or_more, load_literal])
+    load_operand = parser.Or[regex.Regex]([load_or, load_and, load_literal])
+
+    load_operation = parser.Or[regex.Regex](
+        [load_zero_or_more, load_one_or_more, load_zero_or_one, load_until_empty])
+
+    load_rule = parser.Or[regex.Regex]([load_operation, load_operand])
 
     _, rules = parser.UntilEmpty[regex.Regex](
         load_rule)(tokens_, parser.Scope[regex.Regex]())

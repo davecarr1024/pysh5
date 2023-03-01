@@ -1,7 +1,10 @@
+from dataclasses import dataclass
+from typing import Optional
 from unittest import TestCase
 from .parser import *
 
 
+@dataclass(frozen=True)
 class Val:
     @classmethod
     @abstractmethod
