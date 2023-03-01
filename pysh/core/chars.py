@@ -8,6 +8,9 @@ class Position:
     line: int = 0
     col: int = 0
 
+    def __str__(self) -> str:
+        return f'({self.line},{self.col})'
+
     def __add__(self, char: 'Char') -> 'Position':
         if char.val == '\n':
             return Position(self.line+1, 0)
@@ -32,6 +35,12 @@ class Char:
 @dataclass(frozen=True)
 class CharStream(Sized, Iterable[Char]):
     chars: Sequence[Char] = field(default_factory=list[Char])
+
+    def __str__(self) -> str:
+        if self:
+            return f"CharStream({''.join([char.val for char in self.chars])}@{self.head().position})"
+        else:
+            return 'CharStream()'
 
     def __bool__(self) -> bool:
         return bool(self.chars)

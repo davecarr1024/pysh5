@@ -53,16 +53,26 @@ class _AbstractRegex(ABC):
 
 @dataclass(frozen=True)
 class Any(_AbstractRegex):
+    def __str__(self) -> str:
+        return '.'
+
     def __call__(self, state: chars.CharStream) -> StateAndResult:
         return state.tail(), Result([state.head()])
 
 
 @dataclass(frozen=True)
 class Literal(_AbstractRegex):
-    val: chars.Char
+    val: str
+
+    def __post_init__(self):
+        if len(self.val) != 1:
+            raise errors.Error(msg=f'invalid literal val {self.val}')
+
+    def __str__(self) -> str:
+        return self.val
 
     def __call__(self, state: chars.CharStream) -> StateAndResult:
-        if state.head() != self.val:
+        if state.head().val != self.val:
             raise RegexError(regex=self, state=state,
                              msg=f'expected regex literal {self.val} got {state.head()}')
         return state.tail(), Result([state.head()])
@@ -70,8 +80,26 @@ class Literal(_AbstractRegex):
 
 def literal(val: str) -> Regex:
     if len(val) == 1:
-        return Literal(chars.Char(val))
+        return Literal(val)
     return And([literal(c) for c in val])
+
+
+@dataclass(frozen=True)
+class Range(_AbstractRegex):
+    start: str
+    end: str
+
+    def __post_init__(self):
+        if len(self.start) != 1 or len(self.end) != 1:
+            raise errors.Error(msg=f'invalid range {self}')
+
+    def __str__(self) -> str:
+        return f'[{self.start}-{self.end}]'
+
+    def __call__(self, state: chars.CharStream) -> StateAndResult:
+        if state.head().val < self.start or state.head().val > self.end:
+            raise RegexError(regex=self, state=state)
+        return state.tail(), Result([state.head()])
 
 
 @dataclass(frozen=True)
@@ -81,6 +109,9 @@ class _NaryRegex(_AbstractRegex):
 
 @dataclass(frozen=True)
 class And(_NaryRegex):
+    def __str__(self) -> str:
+        return f"({''.join([str(child) for child in self.children])})"
+
     def __call__(self, state: chars.CharStream) -> StateAndResult:
         result = Result()
         for child in self.children:
@@ -94,6 +125,9 @@ class And(_NaryRegex):
 
 @dataclass(frozen=True)
 class Or(_NaryRegex):
+    def __str__(self) -> str:
+        return f"({'|'.join([str(child) for child in self.children])})"
+
     def __call__(self, state: chars.CharStream) -> StateAndResult:
         child_errors: MutableSequence[errors.Error] = []
         for child in self.children:
@@ -111,6 +145,9 @@ class UnaryRegex(_AbstractRegex):
 
 @dataclass(frozen=True)
 class ZeroOrMore(UnaryRegex):
+    def __str__(self) -> str:
+        return f'{self.child}*'
+
     def __call__(self, state: chars.CharStream) -> StateAndResult:
         result = Result()
         while True:
@@ -123,6 +160,9 @@ class ZeroOrMore(UnaryRegex):
 
 @dataclass(frozen=True)
 class OneOrMore(UnaryRegex):
+    def __str__(self) -> str:
+        return f'{self.child}+'
+
     def __call__(self, state: chars.CharStream) -> StateAndResult:
         try:
             state, result = self.child(state)
@@ -138,6 +178,9 @@ class OneOrMore(UnaryRegex):
 
 @dataclass(frozen=True)
 class ZeroOrOne(UnaryRegex):
+    def __str__(self) -> str:
+        return f'{self.child}?'
+
     def __call__(self, state: chars.CharStream) -> StateAndResult:
         try:
             return self.child(state)
@@ -147,6 +190,9 @@ class ZeroOrOne(UnaryRegex):
 
 @dataclass(frozen=True)
 class UntilEmpty(UnaryRegex):
+    def __str__(self) -> str:
+        return f'{self.child}?'
+
     def __call__(self, state: chars.CharStream) -> StateAndResult:
         result = Result()
         while state:
@@ -156,3 +202,16 @@ class UntilEmpty(UnaryRegex):
             except errors.Error as error:
                 raise RegexError(regex=self, state=state, children=[error])
         return state, result
+
+
+@dataclass(frozen=True)
+class Not(UnaryRegex):
+    def __str__(self) -> str:
+        return f'^{self.child}'
+
+    def __call__(self, state: chars.CharStream) -> StateAndResult:
+        try:
+            self.child(state)
+        except errors.Error:
+            return state.tail(), Result()
+        raise RegexError(regex=self, state=state)

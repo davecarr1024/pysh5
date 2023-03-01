@@ -10,6 +10,9 @@ class RuleError(errors.UnaryError):
     rule: 'Rule'
     state: chars.CharStream
 
+    def _repr_line(self) -> str:
+        return f'lexer.RuleError(rule={self.rule},state={self.state}, msg={self.msg})'
+
     def __repr__(self) -> str:
         return self._repr(0)
 
@@ -19,19 +22,25 @@ class LexError(errors.NaryError):
     lexer: 'Lexer'
     state: chars.CharStream
 
+    def _repr_line(self) -> str:
+        return f'LexError(lexer={self.lexer},state={self.state}, msg={self.msg})'
+
     def __repr__(self) -> str:
         return self._repr(0)
 
 
 @dataclass(frozen=True)
 class Rule:
-    rule_name: str
+    name: str
     regex_: regex.Regex
+
+    def __str__(self) -> str:
+        return f'{self.name}={self.regex_}'
 
     def __call__(self, state: chars.CharStream) -> StateAndResult:
         try:
             state, result = self.regex_(state)
-            return state, result.token(self.rule_name)
+            return state, result.token(self.name)
         except errors.Error as error:
             raise RuleError(rule=self, state=state, child=error)
 
@@ -39,6 +48,9 @@ class Rule:
 @dataclass(frozen=True)
 class Lexer(Sized, Iterable[Rule]):
     rules: Sequence[Rule]
+
+    def __str__(self) -> str:
+        return f"Lexer({','.join([str(rule) for rule in self.rules])})"
 
     def __len__(self) -> int:
         return len(self.rules)

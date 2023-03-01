@@ -456,6 +456,58 @@ class RegexTest(TestCase):
                 chars.CharStream.load('aab'),
                 None
             ),
+            (
+                Not(literal('a')),
+                chars.CharStream.load('a'),
+                None,
+            ),
+            (
+                Not(literal('a')),
+                chars.CharStream.load('b'),
+                (
+                    chars.CharStream(),
+                    Result([
+                    ])
+                )
+            ),
+            (
+                Not(literal('a')),
+                chars.CharStream.load('bc'),
+                (
+                    chars.CharStream([
+                        chars.Char('c', chars.Position(0, 1)),
+                    ]),
+                    Result([
+                    ])
+                )
+            ),
+            (
+                Range('a', 'z'),
+                chars.CharStream.load('a'),
+                (
+                    chars.CharStream([]),
+                    Result([
+                        chars.Char('a'),
+                    ])
+                )
+            ),
+            (
+                Range('a', 'z'),
+                chars.CharStream.load('ab'),
+                (
+                    chars.CharStream([
+                        chars.Char('b', chars.Position(0, 1)),
+                    ]),
+                    Result([
+                        chars.Char('a'),
+                    ])
+                )
+            ),
+            (
+                Range('a', 'z'),
+                chars.CharStream.load('1'),
+                None
+            ),
         ]):
             with self.subTest(regex=regex, state=state, expected=expected):
                 if expected is None:
@@ -472,13 +524,13 @@ class RegexTest(TestCase):
             ),
             (
                 'a',
-                Literal(chars.Char('a')),
+                Literal('a'),
             ),
             (
                 'ab',
                 And([
-                    Literal(chars.Char('a')),
-                    Literal(chars.Char('b')),
+                    Literal('a'),
+                    Literal('b'),
                 ]),
             )
         ]):

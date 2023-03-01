@@ -46,10 +46,18 @@ def load_regex(input: str) -> regex.Regex:
     load_zero_or_one = load_postfix('?', regex.ZeroOrOne)
     load_until_empty = load_postfix('!', regex.UntilEmpty)
 
-    load_operand = parser.Or[regex.Regex]([load_or, load_and, load_literal])
+    def load_not(state: tokens.TokenStream, scope: parser.Scope[regex.Regex]) -> parser.StateAndResult[regex.Regex]:
+        state, _ = state.pop('^')
+        state, rule = load_rule(state, scope)
+        return state, regex.Not(rule)
+    
+    def load_range(state: tokens.TokenStream, scope: parser.Scope[regex.Regex]) -> parser.StateAndResult[regex.Regex]:
+        
 
     load_operation = parser.Or[regex.Regex](
-        [load_zero_or_more, load_one_or_more, load_zero_or_one, load_until_empty])
+        [load_zero_or_more, load_one_or_more, load_zero_or_one, load_until_empty, load_not])
+
+    load_operand = parser.Or[regex.Regex]([load_or, load_and, load_literal])
 
     load_rule = parser.Or[regex.Regex]([load_operation, load_operand])
 

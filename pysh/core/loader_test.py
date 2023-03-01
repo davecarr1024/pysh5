@@ -46,6 +46,10 @@ class LoaderTest(TestCase):
                 'a!',
                 regex.UntilEmpty(regex.literal('a')),
             ),
+            (
+                '^a',
+                regex.Not(regex.literal('a')),
+            ),
         ]):
             with self.subTest(input=input, expected=expected):
                 if expected is None:

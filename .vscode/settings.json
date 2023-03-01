@@ -13,6 +13,5 @@
     ],
     "python.linting.mypyEnabled": false,
     "python.linting.enabled": true,
-    "python.linting.pylamaEnabled": true,
-    "python.languageServer": "Pylance"
+    "python.linting.pylintEnabled": true
 }
