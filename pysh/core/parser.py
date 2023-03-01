@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from typing import Callable, Generic, Iterator, Mapping, MutableSequence, Optional, Sequence,  TypeVar
 from . import errors, tokens
 
-_Result = TypeVar('_Result')
+_Result = TypeVar('_Result', covariant=True)
 
 StateAndResult = tuple[tokens.TokenStream, _Result]
 StateAndMultipleResult = tuple[tokens.TokenStream, Sequence[_Result]]
@@ -120,6 +120,13 @@ class Literal(AbstractLiteral[_Result]):
 
     def result(self, token: tokens.Token) -> _Result:
         return self.convert_result(token)
+
+
+def token_val(state: tokens.TokenStream, scope: Scope[str] | None = None, rule_name: str | None = None) -> StateAndResult[str]:
+    if rule_name is not None and state.head().rule_name != rule_name:
+        raise StateError(
+            state=state, msg=f'expected {rule_name} got {state.head().rule_name}')
+    return state.tail(), state.head().val
 
 
 @dataclass(frozen=True)

@@ -52,12 +52,18 @@ def load_regex(input: str) -> regex.Regex:
         return state, regex.Not(rule)
 
     def load_range(state: tokens.TokenStream, scope: parser.Scope[regex.Regex]) -> parser.StateAndResult[regex.Regex]:
-        raise NotImplementedError()
+        state, _ = state.pop('[')
+        state, start = parser.token_val(state, rule_name='literal')
+        state, _ = state.pop('-')
+        state, end = parser.token_val(state, rule_name='literal')
+        state, _ = state.pop(']')
+        return state, regex.Range(start, end)
 
     load_operation = parser.Or[regex.Regex](
         [load_zero_or_more, load_one_or_more, load_zero_or_one, load_until_empty, load_not])
 
-    load_operand = parser.Or[regex.Regex]([load_or, load_and, load_literal])
+    load_operand = parser.Or[regex.Regex](
+        [load_range, load_or, load_and, load_literal])
 
     load_rule = parser.Or[regex.Regex]([load_operation, load_operand])
 

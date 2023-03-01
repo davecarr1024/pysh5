@@ -477,3 +477,73 @@ class RuleTest(TestCase):
                         rule(state, scope)
                 else:
                     self.assertEqual(rule(state, scope), expected)
+
+    def test_token_val(self):
+        for state, rule_name, expected in list[tuple[tokens.TokenStream, Optional[str], Optional[StateAndResult[str]]]]([
+            (
+                tokens.TokenStream([
+                    tokens.Token('r', 'a'),
+                ]),
+                None,
+                (
+                    tokens.TokenStream([]),
+                    'a',
+                ),
+            ),
+            (
+                tokens.TokenStream([
+                    tokens.Token('r', 'a'),
+                    tokens.Token('s', 'b'),
+                ]),
+                None,
+                (
+                    tokens.TokenStream([
+                        tokens.Token('s', 'b'),
+                    ]),
+                    'a',
+                ),
+            ),
+            (
+                tokens.TokenStream([
+                    tokens.Token('r', 'a'),
+                ]),
+                'r',
+                (
+                    tokens.TokenStream([]),
+                    'a',
+                ),
+            ),
+            (
+                tokens.TokenStream([
+                    tokens.Token('r', 'a'),
+                    tokens.Token('s', 'b'),
+                ]),
+                'r',
+                (
+                    tokens.TokenStream([
+                        tokens.Token('s', 'b'),
+                    ]),
+                    'a',
+                ),
+            ),
+            (
+                tokens.TokenStream([
+                    tokens.Token('r', 'a'),
+                ]),
+                's',
+                None,
+            ),
+            (
+                tokens.TokenStream([
+                ]),
+                None,
+                None,
+            ),
+        ]):
+            with self.subTest(state=state, rule_name=rule_name, expected=expected):
+                if expected is None:
+                    with self.assertRaises(errors.Error):
+                        token_val(state, rule_name=rule_name)
+                else:
+                    self.assertEqual(
+                        token_val(state, rule_name=rule_name), expected)

@@ -50,6 +50,10 @@ class LoaderTest(TestCase):
                 '^a',
                 regex.Not(regex.literal('a')),
             ),
+            (
+                '[a-z]',
+                regex.Range('a', 'z'),
+            ),
         ]):
             with self.subTest(input=input, expected=expected):
                 if expected is None:
