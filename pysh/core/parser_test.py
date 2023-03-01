@@ -123,6 +123,16 @@ class RuleTest(TestCase):
                 ),
             ),
             (
+                Ref[Val]('s'),
+                tokens.TokenStream([
+                    tokens.Token('int', '1'),
+                ]),
+                Scope[Val]({
+                    'r': Val.load,
+                }),
+                None,
+            ),
+            (
                 Parser(
                     'r',
                     Scope[Val]({

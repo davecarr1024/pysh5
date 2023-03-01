@@ -51,7 +51,7 @@ class MultipleResultRuleError(Generic[_Result], StateError):
 
 
 @dataclass(frozen=True)
-class Scope(Generic[_Result]):
+class Scope(Generic[_Result], Mapping[str, Rule[_Result]]):
     rules: Mapping[str, Rule[_Result]] = field(
         default_factory=dict[str, Rule[_Result]])
 
