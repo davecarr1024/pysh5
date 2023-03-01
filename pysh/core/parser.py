@@ -89,6 +89,17 @@ class AbstractOptionalResultRule(ABC, Generic[_Result]):
 
 
 @dataclass(frozen=True)
+class Ref(AbstractRule[_Result]):
+    rule_name: str
+
+    def __call__(self, state: tokens.TokenStream, scope: Scope[_Result]) -> StateAndResult[_Result]:
+        if self.rule_name not in scope:
+            raise RuleError(rule=self, state=state,
+                            msg=f'unknown rule {self.rule_name}')
+        return scope[self.rule_name](state, scope)
+
+
+@dataclass(frozen=True)
 class AbstractLiteral(AbstractRule[_Result]):
     rule_name: str
 
@@ -182,7 +193,7 @@ class ZeroOrOne(AbstractOptionalResultRule[_Result]):
         try:
             return self.child(state, scope)
         except errors.Error:
-            return state.tail(), None
+            return state, None
 
 
 @dataclass(frozen=True)

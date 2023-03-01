@@ -110,18 +110,352 @@ class RuleTest(TestCase):
                 )
             ),
             (
-                And[Val]([Val.load, Val.load]),
+                Ref('r'),
                 tokens.TokenStream([
+                    tokens.Token('int', '1'),
+                ]),
+                Scope[Val]({
+                    'r': Val.load,
+                }),
+                (
+                    tokens.TokenStream([]),
+                    Int(1),
+                ),
+            ),
+            (
+                Parser(
+                    'r',
+                    Scope[Val]({
+                        'r': Ref('s'),
+                        's': Val.load,
+                    }),
+                ),
+                tokens.TokenStream([
+                    tokens.Token('int', '1'),
+                ]),
+                Scope[Val](),
+                (
+                    tokens.TokenStream([]),
+                    Int(1),
+                ),
+            ),
+        ]):
+            with self.subTest(rule=rule, state=state, scope=scope, expected=expected):
+                if expected is None:
+                    with self.assertRaises(errors.Error):
+                        rule(state, scope)
+                else:
+                    self.assertEqual(rule(state, scope), expected)
+
+    def test_call_multiple_result(self):
+        for rule, state, scope, expected in list[tuple[MultipleResultRule[Val], tokens.TokenStream, Scope[Val], Optional[StateAndMultipleResult[Val]]]]([
+            (
+                And([Val.load, Val.load]),
+                tokens.TokenStream([
+                    tokens.Token('int', '1'),
                     tokens.Token('str', 'a'),
-                    tokens.Token('r', 'a'),
+                ]),
+                Scope[Val](),
+                (
+                    tokens.TokenStream(),
+                    [Int(1), Str('a')],
+                )
+            ),
+            (
+                And([Val.load, Val.load]),
+                tokens.TokenStream([
+                    tokens.Token('int', '1'),
+                    tokens.Token('str', 'a'),
+                    tokens.Token('s', 'b'),
                 ]),
                 Scope[Val](),
                 (
                     tokens.TokenStream([
-                        tokens.Token('r', 'a'),
+                        tokens.Token('s', 'b'),
                     ]),
-                    Str('a'),
+                    [Int(1), Str('a')],
                 )
+            ),
+            (
+                ZeroOrMore(Val.load),
+                tokens.TokenStream([]),
+                Scope[Val](),
+                (
+                    tokens.TokenStream([]),
+                    [],
+                ),
+            ),
+            (
+                ZeroOrMore(Val.load),
+                tokens.TokenStream([
+                    tokens.Token('int', '1'),
+                ]),
+                Scope[Val](),
+                (
+                    tokens.TokenStream([]),
+                    [
+                        Int(1),
+                    ],
+                ),
+            ),
+            (
+                ZeroOrMore(Val.load),
+                tokens.TokenStream([
+                    tokens.Token('int', '1'),
+                    tokens.Token('str', 'a'),
+                ]),
+                Scope[Val](),
+                (
+                    tokens.TokenStream([]),
+                    [
+                        Int(1),
+                        Str('a'),
+                    ],
+                ),
+            ),
+            (
+                ZeroOrMore(Val.load),
+                tokens.TokenStream([
+                    tokens.Token('s', 'b'),
+                ]),
+                Scope[Val](),
+                (
+                    tokens.TokenStream([
+                        tokens.Token('s', 'b'),
+                    ]),
+                    [],
+                ),
+            ),
+            (
+                ZeroOrMore(Val.load),
+                tokens.TokenStream([
+                    tokens.Token('int', '1'),
+                    tokens.Token('s', 'b'),
+                ]),
+                Scope[Val](),
+                (
+                    tokens.TokenStream([
+                        tokens.Token('s', 'b'),
+                    ]),
+                    [
+                        Int(1),
+                    ],
+                ),
+            ),
+            (
+                ZeroOrMore(Val.load),
+                tokens.TokenStream([
+                    tokens.Token('int', '1'),
+                    tokens.Token('str', 'a'),
+                    tokens.Token('s', 'b'),
+                ]),
+                Scope[Val](),
+                (
+                    tokens.TokenStream([
+                        tokens.Token('s', 'b'),
+                    ]),
+                    [
+                        Int(1),
+                        Str('a'),
+                    ],
+                ),
+            ),
+            (
+                OneOrMore(Val.load),
+                tokens.TokenStream([]),
+                Scope[Val](),
+                None,
+            ),
+            (
+                OneOrMore(Val.load),
+                tokens.TokenStream([
+                    tokens.Token('int', '1'),
+                ]),
+                Scope[Val](),
+                (
+                    tokens.TokenStream([]),
+                    [
+                        Int(1),
+                    ],
+                ),
+            ),
+            (
+                OneOrMore(Val.load),
+                tokens.TokenStream([
+                    tokens.Token('int', '1'),
+                    tokens.Token('str', 'a'),
+                ]),
+                Scope[Val](),
+                (
+                    tokens.TokenStream([]),
+                    [
+                        Int(1),
+                        Str('a'),
+                    ],
+                ),
+            ),
+            (
+                OneOrMore(Val.load),
+                tokens.TokenStream([
+                    tokens.Token('s', 'b'),
+                ]),
+                Scope[Val](),
+                None,
+            ),
+            (
+                OneOrMore(Val.load),
+                tokens.TokenStream([
+                    tokens.Token('int', '1'),
+                    tokens.Token('s', 'b'),
+                ]),
+                Scope[Val](),
+                (
+                    tokens.TokenStream([
+                        tokens.Token('s', 'b'),
+                    ]),
+                    [
+                        Int(1),
+                    ],
+                ),
+            ),
+            (
+                OneOrMore(Val.load),
+                tokens.TokenStream([
+                    tokens.Token('int', '1'),
+                    tokens.Token('str', 'a'),
+                    tokens.Token('s', 'b'),
+                ]),
+                Scope[Val](),
+                (
+                    tokens.TokenStream([
+                        tokens.Token('s', 'b'),
+                    ]),
+                    [
+                        Int(1),
+                        Str('a'),
+                    ],
+                ),
+            ),
+            (
+                UntilEmpty(Val.load),
+                tokens.TokenStream([]),
+                Scope[Val](),
+                (
+                    tokens.TokenStream([]),
+                    [],
+                ),
+            ),
+            (
+                UntilEmpty(Val.load),
+                tokens.TokenStream([
+                    tokens.Token('int', '1'),
+                ]),
+                Scope[Val](),
+                (
+                    tokens.TokenStream([]),
+                    [
+                        Int(1),
+                    ],
+                ),
+            ),
+            (
+                UntilEmpty(Val.load),
+                tokens.TokenStream([
+                    tokens.Token('int', '1'),
+                    tokens.Token('str', 'a'),
+                ]),
+                Scope[Val](),
+                (
+                    tokens.TokenStream([]),
+                    [
+                        Int(1),
+                        Str('a'),
+                    ],
+                ),
+            ),
+            (
+                UntilEmpty(Val.load),
+                tokens.TokenStream([
+                    tokens.Token('s', 'b'),
+                ]),
+                Scope[Val](),
+                None,
+            ),
+            (
+                UntilEmpty(Val.load),
+                tokens.TokenStream([
+                    tokens.Token('int', '1'),
+                    tokens.Token('s', 'b'),
+                ]),
+                Scope[Val](),
+                None,
+            ),
+            (
+                UntilEmpty(Val.load),
+                tokens.TokenStream([
+                    tokens.Token('int', '1'),
+                    tokens.Token('str', 'a'),
+                    tokens.Token('s', 'b'),
+                ]),
+                Scope[Val](),
+                None,
+            ),
+        ]):
+            with self.subTest(rule=rule, state=state, scope=scope, expected=expected):
+                if expected is None:
+                    with self.assertRaises(errors.Error):
+                        rule(state, scope)
+                else:
+                    self.assertEqual(rule(state, scope), expected)
+
+    def test_call_optional(self):
+        for rule, state, scope, expected in list[tuple[OptionalResultRule[Val], tokens.TokenStream, Scope[Val], Optional[StateAndOptionalResult[Val]]]]([
+            (
+                ZeroOrOne(Val.load),
+                tokens.TokenStream([]),
+                Scope[Val](),
+                (
+                    tokens.TokenStream([]),
+                    None,
+                ),
+            ),
+            (
+                ZeroOrOne(Val.load),
+                tokens.TokenStream([
+                    tokens.Token('int', '1'),
+                ]),
+                Scope[Val](),
+                (
+                    tokens.TokenStream([]),
+                    Int(1),
+                ),
+            ),
+            (
+                ZeroOrOne(Val.load),
+                tokens.TokenStream([
+                    tokens.Token('s', 'b'),
+                ]),
+                Scope[Val](),
+                (
+                    tokens.TokenStream([
+                        tokens.Token('s', 'b'),
+                    ]),
+                    None,
+                ),
+            ),
+            (
+                ZeroOrOne(Val.load),
+                tokens.TokenStream([
+                    tokens.Token('int', '1'),
+                    tokens.Token('s', 'b'),
+                ]),
+                Scope[Val](),
+                (
+                    tokens.TokenStream([
+                        tokens.Token('s', 'b'),
+                    ]),
+                    Int(1),
+                ),
             ),
         ]):
             with self.subTest(rule=rule, state=state, scope=scope, expected=expected):
