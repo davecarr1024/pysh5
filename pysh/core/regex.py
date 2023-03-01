@@ -109,12 +109,12 @@ class Or(_NaryRegex):
 
 
 @dataclass(frozen=True)
-class _UnaryRegex(_AbstractRegex):
+class UnaryRegex(_AbstractRegex):
     child: Regex
 
 
 @dataclass(frozen=True)
-class ZeroOrMore(_UnaryRegex):
+class ZeroOrMore(UnaryRegex):
     def __call__(self, state: chars.CharStream) -> StateAndResult:
         result = Result()
         while True:
@@ -126,7 +126,7 @@ class ZeroOrMore(_UnaryRegex):
 
 
 @dataclass(frozen=True)
-class OneOrMore(_UnaryRegex):
+class OneOrMore(UnaryRegex):
     def __call__(self, state: chars.CharStream) -> StateAndResult:
         try:
             state, result = self.child(state)
@@ -141,7 +141,7 @@ class OneOrMore(_UnaryRegex):
 
 
 @dataclass(frozen=True)
-class ZeroOrOne(_UnaryRegex):
+class ZeroOrOne(UnaryRegex):
     def __call__(self, state: chars.CharStream) -> StateAndResult:
         try:
             return self.child(state)
@@ -150,7 +150,7 @@ class ZeroOrOne(_UnaryRegex):
 
 
 @dataclass(frozen=True)
-class UntilEmpty(_UnaryRegex):
+class UntilEmpty(UnaryRegex):
     def __call__(self, state: chars.CharStream) -> StateAndResult:
         result = Result()
         while state:
