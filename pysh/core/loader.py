@@ -50,9 +50,9 @@ def load_regex(input: str) -> regex.Regex:
         state, _ = state.pop('^')
         state, rule = load_rule(state, scope)
         return state, regex.Not(rule)
-    
+
     def load_range(state: tokens.TokenStream, scope: parser.Scope[regex.Regex]) -> parser.StateAndResult[regex.Regex]:
-        
+        raise NotImplementedError()
 
     load_operation = parser.Or[regex.Regex](
         [load_zero_or_more, load_one_or_more, load_zero_or_one, load_until_empty, load_not])
