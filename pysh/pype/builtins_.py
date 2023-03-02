@@ -1,8 +1,8 @@
-from abc import abstractmethod
+from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 import operator
 from typing import Any, Callable, Generic, Mapping, Type, TypeVar
-from ..core import errors
+from ..core import errors, parser, tokens
 from . import classes, funcs, vals
 
 
@@ -26,7 +26,7 @@ class _Class(classes.AbstractClass):
 
 
 @dataclass(frozen=True)
-class Object(classes.Object):
+class Object(classes.Object, ABC):
     class_: classes.AbstractClass = field(compare=False, repr=False)
     _members: vals.Scope = field(compare=False, repr=False)
 
@@ -44,6 +44,11 @@ class Object(classes.Object):
     @abstractmethod
     def from_val(cls, scope: vals.Scope, val: vals.Val) -> Any:
         ...
+
+    @classmethod
+    @abstractmethod
+    def load(cls, state: tokens.TokenStream, scope: parser.Scope[classes.Object]) -> parser.StateAndResult[classes.Object]:
+        return parser.Or[classes.Object]([_IntObject.load, _NoneObject.load])(state, scope)
 
 
 _BuiltinValue = TypeVar('_BuiltinValue')
@@ -93,6 +98,10 @@ class _IntObject(_ValueObject[int]):
             return val.value
         raise errors.Error(msg=f'can''t convert {val} to int')
 
+    @classmethod
+    def load(cls, state: tokens.TokenStream, scope: parser.Scope[classes.Object]) -> parser.StateAndResult[classes.Object]:
+        return parser.Literal[classes.Object]('int', lambda token: int_(int(token.val)))(state, scope)
+
 
 _IntClass = _Class(
     'int',
@@ -111,6 +120,10 @@ class _NoneObject(Object):
     @classmethod
     def from_val(cls, scope: vals.Scope, val: vals.Val) -> Any:
         return None
+
+    @classmethod
+    def load(cls, state: tokens.TokenStream, scope: parser.Scope[classes.Object]) -> parser.StateAndResult[classes.Object]:
+        return parser.Literal[classes.Object]('none', lambda _: none)(state, scope)
 
 
 _NoneClass = _Class(
