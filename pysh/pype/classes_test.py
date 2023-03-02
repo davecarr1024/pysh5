@@ -25,7 +25,7 @@ class ClassTest(TestCase):
                     vals.Params([vals.Param('self')]),
                     statements.Block([
                         statements.Assignment(exprs.ref('self', 'a'),
-                                              exprs.Literal(builtins_.int_(1))),
+                                              exprs.ref(builtins_.int_(1))),
                     ])
                 )
             })

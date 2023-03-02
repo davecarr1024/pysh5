@@ -22,7 +22,7 @@ class FuncTest(TestCase):
                     ]),
                     statements.Block([
                         statements.Assignment(
-                            exprs.ref('a'), exprs.Literal(builtins_.int_(1))),
+                            exprs.ref('a'), exprs.ref(builtins_.int_(1))),
                     ]),
                 ),
                 vals.Args([
@@ -34,7 +34,7 @@ class FuncTest(TestCase):
                     vals.Params([
                     ]),
                     statements.Block([
-                        statements.Return(exprs.Literal(builtins_.int_(1))),
+                        statements.Return(exprs.ref(builtins_.int_(1))),
                     ]),
                 ),
                 vals.Args([

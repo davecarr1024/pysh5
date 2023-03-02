@@ -16,7 +16,6 @@ class Expr(ABC):
             'expr',
             parser.Scope[Expr]({
                 'expr': Expr.load,
-                'literal': Literal.load,
                 'ref': Ref.load,
             })
         )
@@ -24,21 +23,7 @@ class Expr(ABC):
     @classmethod
     @abstractmethod
     def load(cls, state: tokens.TokenStream, scope: parser.Scope['Expr']) -> parser.StateAndResult['Expr']:
-        return parser.Or[Expr]([Literal.load, Ref.load])(state, scope)
-
-
-@dataclass(frozen=True)
-class Literal(Expr):
-    val: vals.Val
-
-    def eval(self, scope: vals.Scope) -> vals.Val:
-        return self.val
-
-    @classmethod
-    def load(cls, state: tokens.TokenStream, scope: parser.Scope['Expr']) -> parser.StateAndResult['Expr']:
-        state, val = builtins_.Object.load(
-            state, parser.Scope[classes.Object]())
-        return state, Literal(val)
+        return parser.Or[Expr]([Ref.load])(state, scope)
 
 
 @dataclass(frozen=True)

@@ -222,16 +222,16 @@ class UntilEmpty(AbstractMultipleResultRule[_Result]):
 @dataclass(frozen=True)
 class Parser(Generic[_Result], AbstractRule[_Result], Mapping[str, Rule[_Result]]):
     root_rule_name: str
-    rules: Scope[_Result]
+    scope: Scope[_Result]
 
     def __len__(self) -> int:
-        return len(self.rules)
+        return len(self.scope)
 
     def __iter__(self) -> Iterator[str]:
-        return iter(self.rules)
+        return iter(self.scope)
 
     def __getitem__(self, name: str) -> Rule[_Result]:
-        return self.rules[name]
+        return self.scope[name]
 
     def __call__(
             self,
@@ -239,6 +239,6 @@ class Parser(Generic[_Result], AbstractRule[_Result], Mapping[str, Rule[_Result]
             scope: Optional[Scope[_Result]] = None,
             rule_name: Optional[str] = None,
     ) -> StateAndResult[_Result]:
-        scope = scope or self.rules
+        scope = scope or self.scope
         rule_name = rule_name or self.root_rule_name
-        return self.rules[rule_name](state, scope)
+        return self.scope[rule_name](state, scope)

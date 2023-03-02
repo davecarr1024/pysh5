@@ -8,7 +8,7 @@ class AssignmentTest(TestCase):
         self.assertEqual(
             statements.Assignment(
                 exprs.Ref(exprs.Ref.Name('a')),
-                exprs.Literal(builtins_.int_(1)),
+                exprs.ref(builtins_.int_(1)),
             ).eval(scope),
             statements.Statement.Result()
         )
@@ -23,7 +23,7 @@ class ReturnTest(TestCase):
                 statements.Statement.Result.for_return(),
             ),
             (
-                statements.Return(exprs.Literal(builtins_.int_(1))),
+                statements.Return(exprs.ref(builtins_.int_(1))),
                 statements.Statement.Result.for_return(builtins_.int_(1)),
             ),
         ]):
@@ -42,7 +42,7 @@ class BlockTest(TestCase):
             (
                 statements.Block([
                     statements.Assignment(
-                        exprs.ref('a'), exprs.Literal(builtins_.int_(1))),
+                        exprs.ref('a'), exprs.ref(builtins_.int_(1))),
                 ]),
                 statements.Statement.Result(),
             ),
@@ -54,14 +54,14 @@ class BlockTest(TestCase):
             ),
             (
                 statements.Block([
-                    statements.Return(exprs.Literal(builtins_.int_(1)),)
+                    statements.Return(exprs.ref(builtins_.int_(1)),)
                 ]),
                 statements.Statement.Result.for_return(builtins_.int_(1)),
             ),
             (
                 statements.Block([
                     statements.Assignment(
-                        exprs.ref('a'), exprs.Literal(builtins_.int_(1))),
+                        exprs.ref('a'), exprs.ref(builtins_.int_(1))),
                     statements.Return(exprs.ref('a')),
                 ]),
                 statements.Statement.Result.for_return(builtins_.int_(1)),
