@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Iterable, Iterator, Optional, Sequence, Sized
 from . import exprs, vals
-from ..core import errors
+from ..core import errors, parser, tokens
 
 
 class Statement(ABC):
@@ -38,10 +38,33 @@ class Statement(ABC):
     def eval(self, scope: vals.Scope) -> Result:
         ...
 
+    @staticmethod
+    def parser_() -> parser.Parser['Statement']:
+        return parser.Parser[Statement](
+            'statement',
+            parser.Scope[Statement]({
+                'statement': Statement.load,
+                'block': Block.load,
+                'return': Return.load,
+                'assignment': Assignment.load,
+                'expr_statement': ExprStatement.load,
+            })
+        )
+
+    @classmethod
+    @abstractmethod
+    def load(cls, state: tokens.TokenStream, scope: parser.Scope['Statement']) -> parser.StateAndResult['Statement']:
+        return parser.Or[Statement]([
+            parser.Ref[Statement]('block'),
+            parser.Ref[Statement]('return'),
+            parser.Ref[Statement]('assignment'),
+            parser.Ref[Statement]('expr_statement'),
+        ])(state, scope)
+
 
 @dataclass(frozen=True)
 class Block(Statement, Sized, Iterable[Statement]):
-    statements: Sequence[Statement]
+    statements: Sequence[Statement] = field(default_factory=list[Statement])
 
     def __len__(self) -> int:
         return len(self.statements)
@@ -56,6 +79,14 @@ class Block(Statement, Sized, Iterable[Statement]):
                 return result
         return Statement.Result()
 
+    @classmethod
+    def load(cls, state: tokens.TokenStream, scope: parser.Scope[Statement]) -> parser.StateAndResult[Statement]:
+        state, _ = state.pop('{')
+        state, statements = parser.ZeroOrMore[Statement](
+            Statement.load)(state, scope)
+        state, _ = state.pop('}')
+        return state, Block(statements)
+
 
 @dataclass(frozen=True)
 class ExprStatement(Statement):
@@ -64,6 +95,12 @@ class ExprStatement(Statement):
     def eval(self, scope: vals.Scope) -> Statement.Result:
         self.val.eval(scope)
         return Statement.Result()
+
+    @classmethod
+    def load(cls, state: tokens.TokenStream, scope: parser.Scope[Statement]) -> parser.StateAndResult[Statement]:
+        state, val = exprs.Expr.parser_()(state)
+        state, _ = state.pop(';')
+        return state, ExprStatement(val)
 
 
 @dataclass(frozen=True)
@@ -75,6 +112,15 @@ class Assignment(Statement):
         self.ref.set(scope, self.val.eval(scope))
         return Statement.Result()
 
+    @classmethod
+    def load(cls, state: tokens.TokenStream, scope: parser.Scope[Statement]) -> parser.StateAndResult[Statement]:
+        state, ref = exprs.Expr.parser_()(state, rule_name='ref')
+        state, _ = state.pop('=')
+        state, val = exprs.Expr.parser_()(state)
+        state, _ = state.pop(';')
+        assert isinstance(ref, exprs.Ref)
+        return state, Assignment(ref, val)
+
 
 @dataclass(frozen=True)
 class Return(Statement):
@@ -82,3 +128,11 @@ class Return(Statement):
 
     def eval(self, scope: vals.Scope) -> Statement.Result:
         return Statement.Result.for_return(self.val.eval(scope) if self.val else None)
+
+    @classmethod
+    def load(cls, state: tokens.TokenStream, scope: parser.Scope[Statement]) -> parser.StateAndResult[Statement]:
+        state, _ = state.pop('return')
+        state, val = parser.ZeroOrOne[exprs.Expr](
+            exprs.Expr.parser_())(state, exprs.Expr.parser_().scope)
+        state, _ = state.pop(';')
+        return state, Return(val)

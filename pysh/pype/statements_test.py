@@ -1,5 +1,7 @@
+from typing import Optional
 from unittest import TestCase
 from . import builtins_, exprs, statements, vals
+from ..core import errors, parser, tokens
 
 
 class AssignmentTest(TestCase):
@@ -69,3 +71,98 @@ class BlockTest(TestCase):
         ]):
             with self.subTest(block=block, expected=expected):
                 self.assertEqual(block.eval(vals.Scope()), expected)
+
+
+class StatementTest(TestCase):
+    def test_load(self):
+        for state, expected in list[tuple[tokens.TokenStream, Optional[parser.StateAndResult[statements.Statement]]]]([
+            (
+                tokens.TokenStream([]),
+                None,
+            ),
+            (
+                tokens.TokenStream([
+                    tokens.Token('{', '{'),
+                    tokens.Token('}', '}'),
+                ]),
+                (
+                    tokens.TokenStream([]),
+                    statements.Block(),
+                ),
+            ),
+            (
+                tokens.TokenStream([
+                    tokens.Token('int', '1'),
+                    tokens.Token(';', ';'),
+                ]),
+                (
+                    tokens.TokenStream([]),
+                    statements.ExprStatement(
+                        exprs.ref(
+                            builtins_.int_(1),
+                        )
+                    ),
+                ),
+            ),
+            (
+                tokens.TokenStream([
+                    tokens.Token('int', '1'),
+                ]),
+                None,
+            ),
+            (
+                tokens.TokenStream([
+                    tokens.Token(';', ';'),
+                ]),
+                None,
+            ),
+            (
+                tokens.TokenStream([
+                    tokens.Token('id', 'a'),
+                    tokens.Token('=', '='),
+                    tokens.Token('int', '1'),
+                    tokens.Token(';', ';'),
+                ]),
+                (
+                    tokens.TokenStream([]),
+                    statements.Assignment(
+                        exprs.ref('a'),
+                        exprs.ref(
+                            builtins_.int_(1)
+                        )
+                    ),
+                ),
+            ),
+            (
+                tokens.TokenStream([
+                    tokens.Token('return', 'return'),
+                    tokens.Token(';', ';'),
+                ]),
+                (
+                    tokens.TokenStream([]),
+                    statements.Return(),
+                ),
+            ),
+            (
+                tokens.TokenStream([
+                    tokens.Token('return', 'return'),
+                    tokens.Token('int', '1'),
+                    tokens.Token(';', ';'),
+                ]),
+                (
+                    tokens.TokenStream([]),
+                    statements.Return(
+                        exprs.ref(
+                            builtins_.int_(1)
+                        )
+                    ),
+                ),
+            ),
+        ]):
+            with self.subTest(state=state, expected=expected):
+                if expected is None:
+                    with self.assertRaises(errors.Error):
+                        statements.Statement.parser_()(state)
+                else:
+                    self.assertEqual(
+                        statements.Statement.parser_()(state), expected)

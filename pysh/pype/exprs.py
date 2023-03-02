@@ -23,7 +23,9 @@ class Expr(ABC):
     @classmethod
     @abstractmethod
     def load(cls, state: tokens.TokenStream, scope: parser.Scope['Expr']) -> parser.StateAndResult['Expr']:
-        return parser.Or[Expr]([Ref.load])(state, scope)
+        return parser.Or[Expr]([
+            parser.Ref[Expr]('ref'),
+        ])(state, scope)
 
 
 @dataclass(frozen=True)
