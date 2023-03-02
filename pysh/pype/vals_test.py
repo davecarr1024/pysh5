@@ -33,7 +33,7 @@ class ScopeTest(TestCase):
 class ArgsTest(TestCase):
     def test_len(self):
         for args, expected in list[tuple[vals.Args, int]]([
-            (vals.Args([]), 0),
+            (vals.Args(), 0),
             (vals.Args([vals.Arg(builtins_.int_(1))]), 1),
             (vals.Args([vals.Arg(builtins_.int_(1)),
              vals.Arg(builtins_.int_(2))]), 2),

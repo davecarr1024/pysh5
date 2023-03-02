@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from typing import Callable, Generic, Iterator, Mapping, MutableSequence, Optional, Sequence,  TypeVar
 from . import errors, tokens
 
-_Result = TypeVar('_Result', covariant=True)
+_Result = TypeVar('_Result')
 
 StateAndResult = tuple[tokens.TokenStream, _Result]
 StateAndMultipleResult = tuple[tokens.TokenStream, Sequence[_Result]]
@@ -220,7 +220,7 @@ class UntilEmpty(AbstractMultipleResultRule[_Result]):
 
 
 @dataclass(frozen=True)
-class Parser(AbstractRule[_Result], Mapping[str, Rule[_Result]]):
+class Parser(Generic[_Result], AbstractRule[_Result], Mapping[str, Rule[_Result]]):
     root_rule_name: str
     rules: Scope[_Result]
 

@@ -76,10 +76,10 @@ class Scope(MutableMapping[str, Val]):
 
     @property
     def all_vals(self) -> Mapping[str, Val]:
-        vals: MutableMapping[str, Val] = {}
+        vals: dict[str, Val] = {}
         if self.parent is not None:
-            vals |= self.parent.all_vals
-        vals |= self._vals
+            vals |= dict(self.parent.all_vals)
+        vals |= dict(self._vals)
         return vals
 
     def bind(self, object_: Val) -> None:
@@ -95,7 +95,7 @@ class Arg:
 
 @dataclass(frozen=True)
 class Args(Sized, Iterable[Arg]):
-    args: Sequence[Arg]
+    args: Sequence[Arg] = field(default_factory=list[Arg])
 
     def __len__(self) -> int:
         return len(self.args)
