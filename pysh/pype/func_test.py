@@ -1,85 +1,88 @@
 from unittest import TestCase
-from .func import *
+from . import builtins_, classes, exprs, func, statements, vals
 
 
 class FuncTest(TestCase):
     def test_call(self):
-        for func, args, expected in list[tuple[Func, Args, Val]]([
+        for func_, args, expected in list[tuple[func.Func, vals.Args, vals.Val]]([
             (
-                Func(
-                    Params([
+                func.Func(
+                    vals.Params([
                     ]),
-                    Block([
+                    statements.Block([
                     ]),
                 ),
-                Args([
+                vals.Args([
                 ]),
-                none,
+                builtins_.none,
             ),
             (
-                Func(
-                    Params([
+                func.Func(
+                    vals.Params([
                     ]),
-                    Block([
-                        Assignment(ref('a'), Literal(int_(1))),
+                    statements.Block([
+                        statements.Assignment(
+                            exprs.ref('a'), exprs.Literal(builtins_.int_(1))),
                     ]),
                 ),
-                Args([
+                vals.Args([
                 ]),
-                none,
+                builtins_.none,
             ),
             (
-                Func(
-                    Params([
+                func.Func(
+                    vals.Params([
                     ]),
-                    Block([
-                        Return(Literal(int_(1))),
+                    statements.Block([
+                        statements.Return(exprs.Literal(builtins_.int_(1))),
                     ]),
                 ),
-                Args([
+                vals.Args([
                 ]),
-                int_(1),
+                builtins_.int_(1),
             ),
             (
-                Func(
-                    Params([
-                        Param('a'),
+                func.Func(
+                    vals.Params([
+                        vals.Param('a'),
                     ]),
-                    Block([
-                        Return(Ref(Ref.Name('a'))),
+                    statements.Block([
+                        statements.Return(exprs.Ref(exprs.Ref.Name('a'))),
                     ]),
                 ),
-                Args([
-                    Arg(int_(1)),
+                vals.Args([
+                    vals.Arg(builtins_.int_(1)),
                 ]),
-                int_(1),
+                builtins_.int_(1),
             ),
         ]):
-            with self.subTest(func=func, args=args, expected=expected):
-                self.assertEqual(func(Scope(), args), expected)
+            with self.subTest(func_=func_, args=args, expected=expected):
+                self.assertEqual(func_(vals.Scope(), args), expected)
 
 
 class MethodTest(TestCase):
     def test_call(self):
-        for method, object_, args, expected in list[tuple[Method, Val, Args, Val]]([
+        for method, object_, args, expected in list[tuple[func.Method, vals.Val, vals.Args, vals.Val]]([
             (
-                Method(
-                    Params([
-                        Param('self'),
+                func.Method(
+                    vals.Params([
+                        vals.Param('self'),
                     ]),
-                    Block([
-                        Return(Ref(Ref.Name('self'), [Ref.Member('a')])),
+                    statements.Block([
+                        statements.Return(exprs.Ref(exprs.Ref.Name(
+                            'self'), [exprs.Ref.Member('a')])),
                     ])
                 ),
-                Object(
-                    Class('c', Scope()),
-                    Scope({
-                        'a': int_(1),
+                classes.Object(
+                    classes.Class('c', vals.Scope()),
+                    vals.Scope({
+                        'a': builtins_.int_(1),
                     })
                 ),
-                Args([]),
-                int_(1),
+                vals.Args([]),
+                builtins_.int_(1),
             ),
         ]):
             with self.subTest(method=method, object_=object_, args=args, expected=expected):
-                self.assertEqual(method.bind(object_)(Scope(), args), expected)
+                self.assertEqual(method.bind(object_)(
+                    vals.Scope(), args), expected)

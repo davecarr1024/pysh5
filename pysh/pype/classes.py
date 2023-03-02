@@ -1,9 +1,11 @@
 from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from typing import Any, Type
-from .vals import *
+from . import vals
+from ..core import errors
 
 
-class AbstractClass(ABC, Val):
+class AbstractClass(ABC, vals.Val):
     @property
     @abstractmethod
     def name(self) -> str:
@@ -19,7 +21,7 @@ class AbstractClass(ABC, Val):
         object_.members.bind(object_)
         return object_
 
-    def __call__(self, scope: Scope, args: Args) -> Val:
+    def __call__(self, scope: vals.Scope, args: vals.Args) -> vals.Val:
         object_ = self.instantiate()
         if '__init__' in object_:
             object_['__init__'](scope, args)
@@ -29,27 +31,27 @@ class AbstractClass(ABC, Val):
 @dataclass(frozen=True)
 class Class(AbstractClass):
     _name: str
-    _members: Scope
+    _members: vals.Scope
 
     @property
     def name(self) -> str:
         return self._name
 
     @property
-    def members(self) -> Scope:
+    def members(self) -> vals.Scope:
         return self._members
 
 
 @dataclass(frozen=True)
-class Object(Val):
+class Object(vals.Val):
     class_: AbstractClass
-    _members: Scope
+    _members: vals.Scope
 
     @property
-    def members(self) -> Scope:
+    def members(self) -> vals.Scope:
         return self._members
 
-    def __call__(self, scope: Scope, args: Args) -> Val:
+    def __call__(self, scope: vals.Scope, args: vals.Args) -> vals.Val:
         if '__call__' not in self:
-            raise Error(msg=f'calling uncallable object {self}')
+            raise errors.Error(msg=f'calling uncallable object {self}')
         return self['__call__'](scope, args)

@@ -1,7 +1,6 @@
 from typing import Optional
 from unittest import TestCase
-from .loader import *
-from . import errors
+from . import errors, loader, regex
 
 
 class LoaderTest(TestCase):
@@ -58,6 +57,6 @@ class LoaderTest(TestCase):
             with self.subTest(input=input, expected=expected):
                 if expected is None:
                     with self.assertRaises(errors.Error):
-                        load_regex(input)
+                        loader.load_regex(input)
                 else:
-                    self.assertEqual(load_regex(input), expected)
+                    self.assertEqual(loader.load_regex(input), expected)

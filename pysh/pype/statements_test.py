@@ -1,70 +1,71 @@
 from unittest import TestCase
-from .statements import *
-from .builtins_ import *
+from . import builtins_, exprs, statements, vals
 
 
 class AssignmentTest(TestCase):
     def test_eval(self):
-        scope = Scope()
+        scope = vals.Scope()
         self.assertEqual(
-            Assignment(
-                Ref(Ref.Name('a')),
-                Literal(int_(1)),
+            statements.Assignment(
+                exprs.Ref(exprs.Ref.Name('a')),
+                exprs.Literal(builtins_.int_(1)),
             ).eval(scope),
-            Statement.Result()
+            statements.Statement.Result()
         )
-        self.assertEqual(scope['a'], int_(1))
+        self.assertEqual(scope['a'], builtins_.int_(1))
 
 
 class ReturnTest(TestCase):
     def test_eval(self):
-        for return_, expected in list[tuple[Return, Statement.Result]]([
+        for return_, expected in list[tuple[statements.Return, statements.Statement.Result]]([
             (
-                Return(),
-                Statement.Result.for_return(),
+                statements.Return(),
+                statements.Statement.Result.for_return(),
             ),
             (
-                Return(Literal(int_(1))),
-                Statement.Result.for_return(int_(1)),
+                statements.Return(exprs.Literal(builtins_.int_(1))),
+                statements.Statement.Result.for_return(builtins_.int_(1)),
             ),
         ]):
             with self.subTest(return_=return_, expected=expected):
-                self.assertEqual(return_.eval(Scope()), expected)
+                self.assertEqual(return_.eval(vals.Scope()), expected)
 
 
 class BlockTest(TestCase):
     def test_eval(self):
-        for block, expected in list[tuple[Block, Statement.Result]]([
+        for block, expected in list[tuple[statements.Block, statements.Statement.Result]]([
             (
-                Block([
+                statements.Block([
                 ]),
-                Statement.Result(),
+                statements.Statement.Result(),
             ),
             (
-                Block([
-                    Assignment(ref('a'), Literal(int_(1))),
+                statements.Block([
+                    statements.Assignment(
+                        exprs.ref('a'), exprs.Literal(builtins_.int_(1))),
                 ]),
-                Statement.Result(),
+                statements.Statement.Result(),
             ),
             (
-                Block([
-                    Return()
+                statements.Block([
+                    statements.Return()
                 ]),
-                Statement.Result.for_return(),
+                statements.Statement.Result.for_return(),
             ),
             (
-                Block([
-                    Return(Literal(int_(1)),)
+                statements.Block([
+                    statements.Return(exprs.Literal(builtins_.int_(1)),)
                 ]),
-                Statement.Result.for_return(int_(1)),
+                statements.Statement.Result.for_return(builtins_.int_(1)),
             ),
             (
-                Block([
-                    Assignment(ref('a'), Literal(int_(1))),
-                    Return(ref('a')),
+                statements.Block([
+                    statements.Assignment(
+                        exprs.ref('a'), exprs.Literal(builtins_.int_(1))),
+                    statements.Return(exprs.ref('a')),
                 ]),
-                Statement.Result.for_return(int_(1)),
+                statements.Statement.Result.for_return(builtins_.int_(1)),
             ),
         ]):
             with self.subTest(block=block, expected=expected):
-                self.assertEqual(block.eval(Scope()), expected)
+                self.assertEqual(block.eval(vals.Scope()), expected)

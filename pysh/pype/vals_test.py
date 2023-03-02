@@ -1,116 +1,120 @@
 from unittest import TestCase
-from .vals import *
-from .builtins_ import *
+from . import builtins_,  vals
+from ..core import errors
 
 
 class ScopeTest(TestCase):
     def test_set(self):
-        s = Scope()
+        s = vals.Scope()
         self.assertNotIn('a', s)
-        s['a'] = int_(1)
+        s['a'] = builtins_.int_(1)
         self.assertIn('a', s)
-        self.assertEqual(s['a'], int_(1))
+        self.assertEqual(s['a'], builtins_.int_(1))
         del s['a']
         self.assertNotIn('a', s)
 
     def test_as_child(self):
-        p = Scope({'a': int_(1)})
-        s = p.as_child({'a': int_(2), 'b': int_(3)})
-        self.assertEqual(p['a'], int_(1))
-        self.assertEqual(s['a'], int_(2))
+        p = vals.Scope({'a': builtins_.int_(1)})
+        s = p.as_child({'a': builtins_.int_(2), 'b': builtins_.int_(3)})
+        self.assertEqual(p['a'], builtins_.int_(1))
+        self.assertEqual(s['a'], builtins_.int_(2))
         self.assertNotIn('b', p)
-        self.assertEqual(s['b'], int_(3))
+        self.assertEqual(s['b'], builtins_.int_(3))
         self.assertDictEqual(
             p.all_vals,
-            {'a': int_(1)}
+            {'a': builtins_.int_(1)}
         )
         self.assertDictEqual(
             s.all_vals,
-            {'a': int_(2), 'b': int_(3)}
+            {'a': builtins_.int_(2), 'b': builtins_.int_(3)}
         )
 
 
 class ArgsTest(TestCase):
     def test_len(self):
-        for args, expected in list[tuple[Args, int]]([
-            (Args([]), 0),
-            (Args([Arg(int_(1))]), 1),
-            (Args([Arg(int_(1)), Arg(int_(2))]), 2),
+        for args, expected in list[tuple[vals.Args, int]]([
+            (vals.Args([]), 0),
+            (vals.Args([vals.Arg(builtins_.int_(1))]), 1),
+            (vals.Args([vals.Arg(builtins_.int_(1)),
+             vals.Arg(builtins_.int_(2))]), 2),
         ]):
             with self.subTest(args=args, expected=expected):
                 self.assertEqual(len(args), expected)
 
     def test_prepend(self):
         self.assertEqual(
-            Args([Arg(int_(1))]).prepend(Arg(int_(2))),
-            Args([Arg(int_(2)), Arg(int_(1))])
+            vals.Args([vals.Arg(builtins_.int_(1))]).prepend(
+                vals.Arg(builtins_.int_(2))),
+            vals.Args([vals.Arg(builtins_.int_(2)),
+                      vals.Arg(builtins_.int_(1))])
         )
 
 
 class ParamsTest(TestCase):
     def test_bind_fail(self):
-        with self.assertRaises(Error):
-            Params([]).bind(Scope(), Args([Arg(int_(1))]))
+        with self.assertRaises(errors.Error):
+            vals.Params([]).bind(vals.Scope(), vals.Args(
+                [vals.Arg(builtins_.int_(1))]))
 
     def test_bind(self):
-        for params, args, expected in list[tuple[Params, Args, Scope]]([
+        for params, args, expected in list[tuple[vals.Params, vals.Args, vals.Scope]]([
             (
-                Params([
+                vals.Params([
                 ]),
-                Args([
+                vals.Args([
                 ]),
-                Scope({
-                    'a': int_(1),
+                vals.Scope({
+                    'a': builtins_.int_(1),
                 })
             ),
             (
-                Params([
-                    Param('a'),
+                vals.Params([
+                    vals.Param('a'),
                 ]),
-                Args([
-                    Arg(int_(2)),
+                vals.Args([
+                    vals.Arg(builtins_.int_(2)),
                 ]),
-                Scope({
-                    'a': int_(2),
+                vals.Scope({
+                    'a': builtins_.int_(2),
                 })
             ),
             (
-                Params([
-                    Param('b'),
+                vals.Params([
+                    vals.Param('b'),
                 ]),
-                Args([
-                    Arg(int_(2)),
+                vals.Args([
+                    vals.Arg(builtins_.int_(2)),
                 ]),
-                Scope({
-                    'a': int_(1),
-                    'b': int_(2),
+                vals.Scope({
+                    'a': builtins_.int_(1),
+                    'b': builtins_.int_(2),
                 })
             ),
         ]):
             with self.subTest(params=params, args=args, expected=expected):
                 self.assertEqual(params.bind(
-                    Scope({'a': int_(1)}), args), expected)
+                    vals.Scope({'a': builtins_.int_(1)}), args), expected)
 
     def test_tail_fail(self):
-        with self.assertRaises(Error):
-            Params([]).tail
+        with self.assertRaises(errors.Error):
+            vals.Params([]).tail
 
     def test_tail(self):
-        for params, expected in list[tuple[Params, Params]]([
+        for params, expected in list[tuple[vals.Params, vals.Params]]([
             (
-                Params([
-                    Param('a'),
+                vals.Params([
+                    vals.Param('a'),
                 ]),
-                Params([
+                vals.Params([
                 ]),
             ),
             (
-                Params([
-                    Param('a'),
-                    Param('b'),
+                vals.Params([
+                    vals.Param('a'),
+                    vals.Param('b'),
                 ]),
-                Params([
-                    Param('b'),
+                vals.Params([
+                    vals.Param('b'),
                 ]),
             ),
         ]):

@@ -1,15 +1,16 @@
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Optional
 from unittest import TestCase
-from .parser import *
+from . import errors, parser, tokens
 
 
 @dataclass(frozen=True)
-class Val:
+class Val(ABC):
     @classmethod
     @abstractmethod
-    def load(cls, state: tokens.TokenStream, scope: Scope['Val']) -> StateAndResult['Val']:
-        return Or[Val]([Int.load, Str.load])(state, scope)
+    def load(cls, state: tokens.TokenStream, scope: parser.Scope['Val']) -> parser.StateAndResult['Val']:
+        return parser.Or[Val]([Int.load, Str.load])(state, scope)
 
 
 @dataclass(frozen=True)
@@ -17,11 +18,12 @@ class Int(Val):
     val: int
 
     @classmethod
-    def load(cls, state: tokens.TokenStream, scope: Scope[Val]) -> StateAndResult[Val]:
+    def load(cls, state: tokens.TokenStream, scope: parser.Scope[Val]) -> parser.StateAndResult[Val]:
         try:
-            return Literal[Val]('int', lambda token: Int(int(token.val)))(state, scope)
+            return parser.Literal[Val]('int', lambda token: Int(int(token.val)))(state, scope)
         except ValueError as error:
-            raise StateError(state=state, msg=f'failed to load int: {error}')
+            raise parser.StateError(
+                state=state, msg=f'failed to load int: {error}')
 
 
 @dataclass(frozen=True)
@@ -29,19 +31,19 @@ class Str(Val):
     val: str
 
     @classmethod
-    def load(cls, state: tokens.TokenStream, scope: Scope[Val]) -> StateAndResult[Val]:
-        return Literal[Val]('str', lambda token: Str(token.val))(state, scope)
+    def load(cls, state: tokens.TokenStream, scope: parser.Scope[Val]) -> parser.StateAndResult[Val]:
+        return parser.Literal[Val]('str', lambda token: Str(token.val))(state, scope)
 
 
 class ScopeTest(TestCase):
     def test_or(self):
         self.assertEqual(
-            Scope[Val]({
+            parser.Scope[Val]({
                 'a': Int.load,
-            }) | Scope[Val]({
+            }) | parser.Scope[Val]({
                 'b': Str.load,
             }),
-            Scope[Val]({
+            parser.Scope[Val]({
                 'a': Int.load,
                 'b': Str.load,
             })
@@ -50,13 +52,13 @@ class ScopeTest(TestCase):
 
 class RuleTest(TestCase):
     def test_call(self):
-        for rule, state, scope, expected in list[tuple[Rule[Val], tokens.TokenStream, Scope[Val], Optional[StateAndResult[Val]]]]([
+        for rule, state, scope, expected in list[tuple[parser.Rule[Val], tokens.TokenStream, parser.Scope[Val], Optional[parser.StateAndResult[Val]]]]([
             (
                 Int.load,
                 tokens.TokenStream([
                     tokens.Token('int', '1'),
                 ]),
-                Scope[Val](),
+                parser.Scope[Val](),
                 (
                     tokens.TokenStream(),
                     Int(1),
@@ -68,7 +70,7 @@ class RuleTest(TestCase):
                     tokens.Token('int', '1'),
                     tokens.Token('r', 'a'),
                 ]),
-                Scope[Val](),
+                parser.Scope[Val](),
                 (
                     tokens.TokenStream([
                         tokens.Token('r', 'a'),
@@ -81,7 +83,7 @@ class RuleTest(TestCase):
                 tokens.TokenStream([
                     tokens.Token('int', '1'),
                 ]),
-                Scope[Val](),
+                parser.Scope[Val](),
                 (
                     tokens.TokenStream(),
                     Int(1),
@@ -92,7 +94,7 @@ class RuleTest(TestCase):
                 tokens.TokenStream([
                     tokens.Token('str', 'a'),
                 ]),
-                Scope[Val](),
+                parser.Scope[Val](),
                 (
                     tokens.TokenStream(),
                     Str('a'),
@@ -104,7 +106,7 @@ class RuleTest(TestCase):
                     tokens.Token('str', 'a'),
                     tokens.Token('r', 'a'),
                 ]),
-                Scope[Val](),
+                parser.Scope[Val](),
                 (
                     tokens.TokenStream([
                         tokens.Token('r', 'a'),
@@ -113,11 +115,11 @@ class RuleTest(TestCase):
                 )
             ),
             (
-                Ref('r'),
+                parser.Ref('r'),
                 tokens.TokenStream([
                     tokens.Token('int', '1'),
                 ]),
-                Scope[Val]({
+                parser.Scope[Val]({
                     'r': Val.load,
                 }),
                 (
@@ -126,27 +128,27 @@ class RuleTest(TestCase):
                 ),
             ),
             (
-                Ref[Val]('s'),
+                parser.Ref[Val]('s'),
                 tokens.TokenStream([
                     tokens.Token('int', '1'),
                 ]),
-                Scope[Val]({
+                parser.Scope[Val]({
                     'r': Val.load,
                 }),
                 None,
             ),
             (
-                Parser(
+                parser.Parser(
                     'r',
-                    Scope[Val]({
-                        'r': Ref('s'),
+                    parser.Scope[Val]({
+                        'r': parser.Ref('s'),
                         's': Val.load,
                     }),
                 ),
                 tokens.TokenStream([
                     tokens.Token('int', '1'),
                 ]),
-                Scope[Val](),
+                parser.Scope[Val](),
                 (
                     tokens.TokenStream([]),
                     Int(1),
@@ -161,27 +163,27 @@ class RuleTest(TestCase):
                     self.assertEqual(rule(state, scope), expected)
 
     def test_call_multiple_result(self):
-        for rule, state, scope, expected in list[tuple[MultipleResultRule[Val], tokens.TokenStream, Scope[Val], Optional[StateAndMultipleResult[Val]]]]([
+        for rule, state, scope, expected in list[tuple[parser.MultipleResultRule[Val], tokens.TokenStream, parser.Scope[Val], Optional[parser.StateAndMultipleResult[Val]]]]([
             (
-                And([Val.load, Val.load]),
+                parser.And([Val.load, Val.load]),
                 tokens.TokenStream([
                     tokens.Token('int', '1'),
                     tokens.Token('str', 'a'),
                 ]),
-                Scope[Val](),
+                parser.Scope[Val](),
                 (
                     tokens.TokenStream(),
                     [Int(1), Str('a')],
                 )
             ),
             (
-                And([Val.load, Val.load]),
+                parser.And([Val.load, Val.load]),
                 tokens.TokenStream([
                     tokens.Token('int', '1'),
                     tokens.Token('str', 'a'),
                     tokens.Token('s', 'b'),
                 ]),
-                Scope[Val](),
+                parser.Scope[Val](),
                 (
                     tokens.TokenStream([
                         tokens.Token('s', 'b'),
@@ -190,20 +192,20 @@ class RuleTest(TestCase):
                 )
             ),
             (
-                ZeroOrMore(Val.load),
+                parser.ZeroOrMore(Val.load),
                 tokens.TokenStream([]),
-                Scope[Val](),
+                parser.Scope[Val](),
                 (
                     tokens.TokenStream([]),
                     [],
                 ),
             ),
             (
-                ZeroOrMore(Val.load),
+                parser.ZeroOrMore(Val.load),
                 tokens.TokenStream([
                     tokens.Token('int', '1'),
                 ]),
-                Scope[Val](),
+                parser.Scope[Val](),
                 (
                     tokens.TokenStream([]),
                     [
@@ -212,12 +214,12 @@ class RuleTest(TestCase):
                 ),
             ),
             (
-                ZeroOrMore(Val.load),
+                parser.ZeroOrMore(Val.load),
                 tokens.TokenStream([
                     tokens.Token('int', '1'),
                     tokens.Token('str', 'a'),
                 ]),
-                Scope[Val](),
+                parser.Scope[Val](),
                 (
                     tokens.TokenStream([]),
                     [
@@ -227,11 +229,11 @@ class RuleTest(TestCase):
                 ),
             ),
             (
-                ZeroOrMore(Val.load),
+                parser.ZeroOrMore(Val.load),
                 tokens.TokenStream([
                     tokens.Token('s', 'b'),
                 ]),
-                Scope[Val](),
+                parser.Scope[Val](),
                 (
                     tokens.TokenStream([
                         tokens.Token('s', 'b'),
@@ -240,12 +242,12 @@ class RuleTest(TestCase):
                 ),
             ),
             (
-                ZeroOrMore(Val.load),
+                parser.ZeroOrMore(Val.load),
                 tokens.TokenStream([
                     tokens.Token('int', '1'),
                     tokens.Token('s', 'b'),
                 ]),
-                Scope[Val](),
+                parser.Scope[Val](),
                 (
                     tokens.TokenStream([
                         tokens.Token('s', 'b'),
@@ -256,13 +258,13 @@ class RuleTest(TestCase):
                 ),
             ),
             (
-                ZeroOrMore(Val.load),
+                parser.ZeroOrMore(Val.load),
                 tokens.TokenStream([
                     tokens.Token('int', '1'),
                     tokens.Token('str', 'a'),
                     tokens.Token('s', 'b'),
                 ]),
-                Scope[Val](),
+                parser.Scope[Val](),
                 (
                     tokens.TokenStream([
                         tokens.Token('s', 'b'),
@@ -274,17 +276,17 @@ class RuleTest(TestCase):
                 ),
             ),
             (
-                OneOrMore(Val.load),
+                parser.OneOrMore(Val.load),
                 tokens.TokenStream([]),
-                Scope[Val](),
+                parser.Scope[Val](),
                 None,
             ),
             (
-                OneOrMore(Val.load),
+                parser.OneOrMore(Val.load),
                 tokens.TokenStream([
                     tokens.Token('int', '1'),
                 ]),
-                Scope[Val](),
+                parser.Scope[Val](),
                 (
                     tokens.TokenStream([]),
                     [
@@ -293,12 +295,12 @@ class RuleTest(TestCase):
                 ),
             ),
             (
-                OneOrMore(Val.load),
+                parser.OneOrMore(Val.load),
                 tokens.TokenStream([
                     tokens.Token('int', '1'),
                     tokens.Token('str', 'a'),
                 ]),
-                Scope[Val](),
+                parser.Scope[Val](),
                 (
                     tokens.TokenStream([]),
                     [
@@ -308,20 +310,20 @@ class RuleTest(TestCase):
                 ),
             ),
             (
-                OneOrMore(Val.load),
+                parser.OneOrMore(Val.load),
                 tokens.TokenStream([
                     tokens.Token('s', 'b'),
                 ]),
-                Scope[Val](),
+                parser.Scope[Val](),
                 None,
             ),
             (
-                OneOrMore(Val.load),
+                parser.OneOrMore(Val.load),
                 tokens.TokenStream([
                     tokens.Token('int', '1'),
                     tokens.Token('s', 'b'),
                 ]),
-                Scope[Val](),
+                parser.Scope[Val](),
                 (
                     tokens.TokenStream([
                         tokens.Token('s', 'b'),
@@ -332,13 +334,13 @@ class RuleTest(TestCase):
                 ),
             ),
             (
-                OneOrMore(Val.load),
+                parser.OneOrMore(Val.load),
                 tokens.TokenStream([
                     tokens.Token('int', '1'),
                     tokens.Token('str', 'a'),
                     tokens.Token('s', 'b'),
                 ]),
-                Scope[Val](),
+                parser.Scope[Val](),
                 (
                     tokens.TokenStream([
                         tokens.Token('s', 'b'),
@@ -350,20 +352,20 @@ class RuleTest(TestCase):
                 ),
             ),
             (
-                UntilEmpty(Val.load),
+                parser.UntilEmpty(Val.load),
                 tokens.TokenStream([]),
-                Scope[Val](),
+                parser.Scope[Val](),
                 (
                     tokens.TokenStream([]),
                     [],
                 ),
             ),
             (
-                UntilEmpty(Val.load),
+                parser.UntilEmpty(Val.load),
                 tokens.TokenStream([
                     tokens.Token('int', '1'),
                 ]),
-                Scope[Val](),
+                parser.Scope[Val](),
                 (
                     tokens.TokenStream([]),
                     [
@@ -372,12 +374,12 @@ class RuleTest(TestCase):
                 ),
             ),
             (
-                UntilEmpty(Val.load),
+                parser.UntilEmpty(Val.load),
                 tokens.TokenStream([
                     tokens.Token('int', '1'),
                     tokens.Token('str', 'a'),
                 ]),
-                Scope[Val](),
+                parser.Scope[Val](),
                 (
                     tokens.TokenStream([]),
                     [
@@ -387,30 +389,30 @@ class RuleTest(TestCase):
                 ),
             ),
             (
-                UntilEmpty(Val.load),
+                parser.UntilEmpty(Val.load),
                 tokens.TokenStream([
                     tokens.Token('s', 'b'),
                 ]),
-                Scope[Val](),
+                parser.Scope[Val](),
                 None,
             ),
             (
-                UntilEmpty(Val.load),
+                parser.UntilEmpty(Val.load),
                 tokens.TokenStream([
                     tokens.Token('int', '1'),
                     tokens.Token('s', 'b'),
                 ]),
-                Scope[Val](),
+                parser.Scope[Val](),
                 None,
             ),
             (
-                UntilEmpty(Val.load),
+                parser.UntilEmpty(Val.load),
                 tokens.TokenStream([
                     tokens.Token('int', '1'),
                     tokens.Token('str', 'a'),
                     tokens.Token('s', 'b'),
                 ]),
-                Scope[Val](),
+                parser.Scope[Val](),
                 None,
             ),
         ]):
@@ -422,33 +424,33 @@ class RuleTest(TestCase):
                     self.assertEqual(rule(state, scope), expected)
 
     def test_call_optional(self):
-        for rule, state, scope, expected in list[tuple[OptionalResultRule[Val], tokens.TokenStream, Scope[Val], Optional[StateAndOptionalResult[Val]]]]([
+        for rule, state, scope, expected in list[tuple[parser.OptionalResultRule[Val], tokens.TokenStream, parser.Scope[Val], Optional[parser.StateAndOptionalResult[Val]]]]([
             (
-                ZeroOrOne(Val.load),
+                parser.ZeroOrOne(Val.load),
                 tokens.TokenStream([]),
-                Scope[Val](),
+                parser.Scope[Val](),
                 (
                     tokens.TokenStream([]),
                     None,
                 ),
             ),
             (
-                ZeroOrOne(Val.load),
+                parser.ZeroOrOne(Val.load),
                 tokens.TokenStream([
                     tokens.Token('int', '1'),
                 ]),
-                Scope[Val](),
+                parser.Scope[Val](),
                 (
                     tokens.TokenStream([]),
                     Int(1),
                 ),
             ),
             (
-                ZeroOrOne(Val.load),
+                parser.ZeroOrOne(Val.load),
                 tokens.TokenStream([
                     tokens.Token('s', 'b'),
                 ]),
-                Scope[Val](),
+                parser.Scope[Val](),
                 (
                     tokens.TokenStream([
                         tokens.Token('s', 'b'),
@@ -457,12 +459,12 @@ class RuleTest(TestCase):
                 ),
             ),
             (
-                ZeroOrOne(Val.load),
+                parser.ZeroOrOne(Val.load),
                 tokens.TokenStream([
                     tokens.Token('int', '1'),
                     tokens.Token('s', 'b'),
                 ]),
-                Scope[Val](),
+                parser.Scope[Val](),
                 (
                     tokens.TokenStream([
                         tokens.Token('s', 'b'),
@@ -479,7 +481,7 @@ class RuleTest(TestCase):
                     self.assertEqual(rule(state, scope), expected)
 
     def test_token_val(self):
-        for state, rule_name, expected in list[tuple[tokens.TokenStream, Optional[str], Optional[StateAndResult[str]]]]([
+        for state, rule_name, expected in list[tuple[tokens.TokenStream, Optional[str], Optional[parser.StateAndResult[str]]]]([
             (
                 tokens.TokenStream([
                     tokens.Token('r', 'a'),
@@ -543,7 +545,7 @@ class RuleTest(TestCase):
             with self.subTest(state=state, rule_name=rule_name, expected=expected):
                 if expected is None:
                     with self.assertRaises(errors.Error):
-                        token_val(state, rule_name=rule_name)
+                        parser.token_val(state, rule_name=rule_name)
                 else:
                     self.assertEqual(
-                        token_val(state, rule_name=rule_name), expected)
+                        parser.token_val(state, rule_name=rule_name), expected)

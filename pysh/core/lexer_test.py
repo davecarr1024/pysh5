@@ -1,14 +1,14 @@
 from typing import Optional
 from unittest import TestCase
-from .lexer import *
+from . import chars, errors, lexer, regex, tokens
 
 
 class LexerTest(TestCase):
     def test_call(self):
-        for lexer, state, expected in list[tuple[Lexer, str, Optional[tokens.TokenStream]]]([
+        for lexer_, state, expected in list[tuple[lexer.Lexer, str, Optional[tokens.TokenStream]]]([
             (
-                Lexer([
-                    Rule('r', regex.literal('a')),
+                lexer.Lexer([
+                    lexer.Rule('r', regex.literal('a')),
                 ]),
                 'aa',
                 tokens.TokenStream([
@@ -17,16 +17,16 @@ class LexerTest(TestCase):
                 ])
             ),
             (
-                Lexer([
-                    Rule('r', regex.literal('a')),
+                lexer.Lexer([
+                    lexer.Rule('r', regex.literal('a')),
                 ]),
                 'ab',
                 None
             ),
             (
-                Lexer([
-                    Rule('r', regex.literal('a')),
-                    Rule('s', regex.literal('b')),
+                lexer.Lexer([
+                    lexer.Rule('r', regex.literal('a')),
+                    lexer.Rule('s', regex.literal('b')),
                 ]),
                 'ab',
                 tokens.TokenStream([
@@ -35,17 +35,17 @@ class LexerTest(TestCase):
                 ])
             ),
             (
-                Lexer([
-                    Rule('r', regex.literal('a')),
-                    Rule('s', regex.literal('b')),
+                lexer.Lexer([
+                    lexer.Rule('r', regex.literal('a')),
+                    lexer.Rule('s', regex.literal('b')),
                 ]),
                 'c',
                 None
             ),
         ]):
-            with self.subTest(lexer=lexer, state=state, expected=expected):
+            with self.subTest(lexer_=lexer_, state=state, expected=expected):
                 if expected is None:
                     with self.assertRaises(errors.Error):
-                        lexer(state)
+                        lexer_(state)
                 else:
-                    self.assertEqual(lexer(state), expected)
+                    self.assertEqual(lexer_(state), expected)

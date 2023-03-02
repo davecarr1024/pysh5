@@ -1,11 +1,11 @@
-from dataclasses import field
-from typing import Iterable, Iterator, Mapping, MutableMapping, Sequence, Sized
-from ..errors import *
+from dataclasses import dataclass, field
+from typing import Iterable, Iterator, Mapping, MutableMapping, Optional, Sequence, Sized
+from ..core import errors
 
 
 class Val(MutableMapping[str, 'Val']):
     def __call__(self, scope: 'Scope', args: 'Args') -> 'Val':
-        raise Error(msg=f'calling uncallable val {self}')
+        raise errors.Error(msg=f'calling uncallable val {self}')
 
     def __len__(self) -> int:
         return len(self.members)
@@ -34,7 +34,7 @@ class Val(MutableMapping[str, 'Val']):
         return False
 
     def bind(self, object_: 'Val') -> 'Val':
-        raise Error(msg=f'binding unbindable val {self}')
+        raise errors.Error(msg=f'binding unbindable val {self}')
 
 
 @dataclass(frozen=True)
@@ -48,7 +48,7 @@ class Scope(MutableMapping[str, Val]):
         elif self.parent is not None:
             return self.parent[name]
         else:
-            raise Error(msg=f'unknown var {name}')
+            raise errors.Error(msg=f'unknown var {name}')
 
     def __setitem__(self, name: str, val: Val) -> None:
         self._vals[name] = val
@@ -57,7 +57,7 @@ class Scope(MutableMapping[str, Val]):
         if name in self._vals:
             del self._vals[name]
         else:
-            raise Error(msg=f'del unknown var {name}')
+            raise errors.Error(msg=f'del unknown var {name}')
 
     def __len__(self) -> int:
         return len(self.all_vals)
@@ -124,12 +124,12 @@ class Params(Sized, Iterable[Param]):
 
     def bind(self, scope: Scope, args: Args) -> Scope:
         if len(args) != len(self):
-            raise Error(
+            raise errors.Error(
                 msg=f'param mismatch: expected {len(self)} args got {len(args)}')
         return scope.as_child({param.name: val.val for param, val in zip(self, args)})
 
     @property
     def tail(self) -> 'Params':
         if not self:
-            raise Error(msg='tail from empty params')
+            raise errors.Error(msg='tail from empty params')
         return Params(self.params[1:])

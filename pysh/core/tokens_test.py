@@ -1,17 +1,17 @@
 from typing import Optional, Sequence
 from unittest import TestCase
-from .tokens import *
+from . import chars, errors, tokens
 
 
 class TokenTest(TestCase):
     def test_load(self):
-        for rule_name, val, expected in list[tuple[str, Sequence[chars.Char] | chars.CharStream, Token]]([
+        for rule_name, val, expected in list[tuple[str, Sequence[chars.Char] | chars.CharStream, tokens.Token]]([
             (
                 'r',
                 [
                     chars.Char('a'),
                 ],
-                Token('r', 'a'),
+                tokens.Token('r', 'a'),
             ),
             (
                 'r',
@@ -19,14 +19,14 @@ class TokenTest(TestCase):
                     chars.Char('a'),
                     chars.Char('b'),
                 ],
-                Token('r', 'ab'),
+                tokens.Token('r', 'ab'),
             ),
             (
                 'r',
                 [
                     chars.Char('a', chars.Position(1, 2)),
                 ],
-                Token('r', 'a', chars.Position(1, 2)),
+                tokens.Token('r', 'a', chars.Position(1, 2)),
             ),
             (
                 'r',
@@ -34,7 +34,7 @@ class TokenTest(TestCase):
                     chars.Char('a', chars.Position(1, 2)),
                     chars.Char('b', chars.Position(1, 3)),
                 ],
-                Token('r', 'ab', chars.Position(1, 2)),
+                tokens.Token('r', 'ab', chars.Position(1, 2)),
             ),
             (
                 'r',
@@ -42,12 +42,12 @@ class TokenTest(TestCase):
                     chars.Char('a'),
                     chars.Char('b'),
                 ]),
-                Token('r', 'ab'),
+                tokens.Token('r', 'ab'),
             )
         ]):
             with self.subTest(rule_name=rule_name, val=val, expected=expected):
                 self.assertEqual(
-                    Token.load(rule_name, val),
+                    tokens.Token.load(rule_name, val),
                     expected
                 )
 
@@ -64,50 +64,50 @@ class TokenTest(TestCase):
         ]):
             with self.subTest(rule_name=rule_name, val=val):
                 with self.assertRaises(errors.Error):
-                    Token.load(rule_name, val)
+                    tokens.Token.load(rule_name, val)
 
 
 class TokensTest(TestCase):
     def test_add(self):
-        for lhs, rhs, expected in list[tuple[TokenStream, TokenStream, TokenStream]]([
+        for lhs, rhs, expected in list[tuple[tokens.TokenStream, tokens.TokenStream, tokens.TokenStream]]([
             (
-                TokenStream([
+                tokens.TokenStream([
                 ]),
-                TokenStream([
+                tokens.TokenStream([
                 ]),
-                TokenStream([
+                tokens.TokenStream([
                 ]),
             ),
             (
-                TokenStream([
-                    Token('r', 'a'),
+                tokens.TokenStream([
+                    tokens.Token('r', 'a'),
                 ]),
-                TokenStream([
+                tokens.TokenStream([
                 ]),
-                TokenStream([
-                    Token('r', 'a'),
-                ]),
-            ),
-            (
-                TokenStream([
-                ]),
-                TokenStream([
-                    Token('r', 'a'),
-                ]),
-                TokenStream([
-                    Token('r', 'a'),
+                tokens.TokenStream([
+                    tokens.Token('r', 'a'),
                 ]),
             ),
             (
-                TokenStream([
-                    Token('r', 'a'),
+                tokens.TokenStream([
                 ]),
-                TokenStream([
-                    Token('s', 'b'),
+                tokens.TokenStream([
+                    tokens.Token('r', 'a'),
                 ]),
-                TokenStream([
-                    Token('r', 'a'),
-                    Token('s', 'b'),
+                tokens.TokenStream([
+                    tokens.Token('r', 'a'),
+                ]),
+            ),
+            (
+                tokens.TokenStream([
+                    tokens.Token('r', 'a'),
+                ]),
+                tokens.TokenStream([
+                    tokens.Token('s', 'b'),
+                ]),
+                tokens.TokenStream([
+                    tokens.Token('r', 'a'),
+                    tokens.Token('s', 'b'),
                 ]),
             ),
         ]):
@@ -115,19 +115,19 @@ class TokensTest(TestCase):
                 self.assertEqual(lhs+rhs, expected)
 
     def test_head(self):
-        for stream, expected in list[tuple[TokenStream, Token]]([
+        for stream, expected in list[tuple[tokens.TokenStream, tokens.Token]]([
             (
-                TokenStream([
-                    Token('r', 'a'),
+                tokens.TokenStream([
+                    tokens.Token('r', 'a'),
                 ]),
-                Token('r', 'a'),
+                tokens.Token('r', 'a'),
             ),
             (
-                TokenStream([
-                    Token('r', 'a'),
-                    Token('s', 'b'),
+                tokens.TokenStream([
+                    tokens.Token('r', 'a'),
+                    tokens.Token('s', 'b'),
                 ]),
-                Token('r', 'a'),
+                tokens.Token('r', 'a'),
             ),
         ]):
             with self.subTest(stream=stream, expected=expected):
@@ -135,24 +135,24 @@ class TokensTest(TestCase):
 
     def test_head_fail(self):
         with self.assertRaises(errors.Error):
-            TokenStream().head()
+            tokens.TokenStream().head()
 
     def test_tail(self):
-        for stream, expected in list[tuple[TokenStream, TokenStream]]([
+        for stream, expected in list[tuple[tokens.TokenStream, tokens.TokenStream]]([
             (
-                TokenStream([
-                    Token('r', 'a'),
+                tokens.TokenStream([
+                    tokens.Token('r', 'a'),
                 ]),
-                TokenStream([
+                tokens.TokenStream([
                 ]),
             ),
             (
-                TokenStream([
-                    Token('r', 'a'),
-                    Token('s', 'b'),
+                tokens.TokenStream([
+                    tokens.Token('r', 'a'),
+                    tokens.Token('s', 'b'),
                 ]),
-                TokenStream([
-                    Token('s', 'b'),
+                tokens.TokenStream([
+                    tokens.Token('s', 'b'),
                 ]),
             ),
         ]):
@@ -161,54 +161,54 @@ class TokensTest(TestCase):
 
     def test_tail_fail(self):
         with self.assertRaises(errors.Error):
-            TokenStream().tail()
+            tokens.TokenStream().tail()
 
     def test_pop(self):
-        for stream, rule_name, expected in list[tuple[TokenStream, Optional[str], tuple[TokenStream, Token]]]([
+        for stream, rule_name, expected in list[tuple[tokens.TokenStream, Optional[str], tuple[tokens.TokenStream, tokens.Token]]]([
             (
-                TokenStream([
-                    Token('r', 'a'),
+                tokens.TokenStream([
+                    tokens.Token('r', 'a'),
                 ]),
                 'r',
                 (
-                    TokenStream(),
-                    Token('r', 'a'),
+                    tokens.TokenStream(),
+                    tokens.Token('r', 'a'),
                 ),
             ),
             (
-                TokenStream([
-                    Token('r', 'a'),
-                    Token('s', 'b'),
+                tokens.TokenStream([
+                    tokens.Token('r', 'a'),
+                    tokens.Token('s', 'b'),
                 ]),
                 'r',
                 (
-                    TokenStream([
-                        Token('s', 'b'),
+                    tokens.TokenStream([
+                        tokens.Token('s', 'b'),
                     ]),
-                    Token('r', 'a'),
+                    tokens.Token('r', 'a'),
                 ),
             ),
             (
-                TokenStream([
-                    Token('r', 'a'),
+                tokens.TokenStream([
+                    tokens.Token('r', 'a'),
                 ]),
                 None,
                 (
-                    TokenStream(),
-                    Token('r', 'a'),
+                    tokens.TokenStream(),
+                    tokens.Token('r', 'a'),
                 ),
             ),
             (
-                TokenStream([
-                    Token('r', 'a'),
-                    Token('s', 'b'),
+                tokens.TokenStream([
+                    tokens.Token('r', 'a'),
+                    tokens.Token('s', 'b'),
                 ]),
                 None,
                 (
-                    TokenStream([
-                        Token('s', 'b'),
+                    tokens.TokenStream([
+                        tokens.Token('s', 'b'),
                     ]),
-                    Token('r', 'a'),
+                    tokens.Token('r', 'a'),
                 ),
             ),
         ]):
@@ -216,18 +216,18 @@ class TokensTest(TestCase):
                 self.assertEqual(stream.pop(rule_name), expected)
 
     def test_pop_fail(self):
-        for stream, rule_name in list[tuple[TokenStream, Optional[str]]]([
+        for stream, rule_name in list[tuple[tokens.TokenStream, Optional[str]]]([
             (
-                TokenStream(),
+                tokens.TokenStream(),
                 None,
             ),
             (
-                TokenStream(),
+                tokens.TokenStream(),
                 'r',
             ),
             (
-                TokenStream([
-                    Token('s', 'a'),
+                tokens.TokenStream([
+                    tokens.Token('s', 'a'),
                 ]),
                 'r',
             ),

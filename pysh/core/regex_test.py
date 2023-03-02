@@ -1,47 +1,47 @@
 from typing import Optional
 from unittest import TestCase
-from .regex import *
+from . import chars, errors, regex, tokens
 
 
 class ResultTest(TestCase):
     def test_add(self):
-        for lhs, rhs, expected in list[tuple[Result, Result, Result]]([
+        for lhs, rhs, expected in list[tuple[regex.Result, regex.Result, regex.Result]]([
             (
-                Result([
+                regex.Result([
                 ]),
-                Result([
+                regex.Result([
                 ]),
-                Result([
+                regex.Result([
                 ]),
             ),
             (
-                Result([
+                regex.Result([
                     chars.Char('a'),
                 ]),
-                Result([
+                regex.Result([
                 ]),
-                Result([
-                    chars.Char('a'),
-                ]),
-            ),
-            (
-                Result([
-                ]),
-                Result([
-                    chars.Char('a'),
-                ]),
-                Result([
+                regex.Result([
                     chars.Char('a'),
                 ]),
             ),
             (
-                Result([
+                regex.Result([
+                ]),
+                regex.Result([
                     chars.Char('a'),
                 ]),
-                Result([
+                regex.Result([
+                    chars.Char('a'),
+                ]),
+            ),
+            (
+                regex.Result([
+                    chars.Char('a'),
+                ]),
+                regex.Result([
                     chars.Char('b'),
                 ]),
-                Result([
+                regex.Result([
                     chars.Char('a'),
                     chars.Char('b'),
                 ]),
@@ -51,15 +51,15 @@ class ResultTest(TestCase):
                 self.assertEqual(lhs+rhs, expected)
 
     def test_position(self):
-        for result, expected in list[tuple[Result, chars.Position]]([
+        for result, expected in list[tuple[regex.Result, chars.Position]]([
             (
-                Result([
+                regex.Result([
                     chars.Char('a', chars.Position(1, 2)),
                 ]),
                 chars.Position(1, 2),
             ),
             (
-                Result([
+                regex.Result([
                     chars.Char('a', chars.Position(1, 2)),
                     chars.Char('b', chars.Position(1, 3)),
                 ]),
@@ -71,22 +71,22 @@ class ResultTest(TestCase):
 
     def test_position_fail(self):
         with self.assertRaises(errors.Error):
-            Result().position()
+            regex.Result().position()
 
     def test_val(self):
-        for result, expected in list[tuple[Result, str]]([
+        for result, expected in list[tuple[regex.Result, str]]([
             (
-                Result(),
+                regex.Result(),
                 '',
             ),
             (
-                Result([
+                regex.Result([
                     chars.Char('a'),
                 ]),
                 'a',
             ),
             (
-                Result([
+                regex.Result([
                     chars.Char('a'),
                     chars.Char('b'),
                 ]),
@@ -98,7 +98,7 @@ class ResultTest(TestCase):
 
     def test_token(self):
         self.assertEqual(
-            Result([
+            regex.Result([
                 chars.Char('a', chars.Position(1, 2)),
                 chars.Char('b', chars.Position(3, 4)),
             ]).token('r'),
@@ -108,431 +108,431 @@ class ResultTest(TestCase):
 
 class RegexTest(TestCase):
     def test_call(self):
-        for regex, state, expected in list[tuple[Regex, chars.CharStream, Optional[StateAndResult]]]([
+        for regex_, state, expected in list[tuple[regex.Regex, chars.CharStream, Optional[regex.StateAndResult]]]([
             (
-                Any(),
+                regex.Any(),
                 chars.CharStream.load('a'),
                 (
                     chars.CharStream(),
-                    Result([
+                    regex.Result([
                         chars.Char('a'),
                     ])
                 )
             ),
             (
-                Any(),
+                regex.Any(),
                 chars.CharStream.load('a', chars.Position(1, 2)),
                 (
                     chars.CharStream(),
-                    Result([
+                    regex.Result([
                         chars.Char('a', chars.Position(1, 2)),
                     ])
                 )
             ),
             (
-                Any(),
+                regex.Any(),
                 chars.CharStream.load('ab'),
                 (
                     chars.CharStream.load('b', chars.Position(0, 1)),
-                    Result([
+                    regex.Result([
                         chars.Char('a'),
                     ])
                 )
             ),
             (
-                literal('a'),
+                regex.literal('a'),
                 chars.CharStream.load('a'),
                 (
                     chars.CharStream(),
-                    Result([
+                    regex.Result([
                         chars.Char('a'),
                     ])
                 )
             ),
             (
-                literal('a'),
+                regex.literal('a'),
                 chars.CharStream.load('ab'),
                 (
                     chars.CharStream.load('b', chars.Position(0, 1)),
-                    Result([
+                    regex.Result([
                         chars.Char('a'),
                     ])
                 )
             ),
             (
-                literal('a'),
+                regex.literal('a'),
                 chars.CharStream.load('b'),
                 None
             ),
             (
-                And([literal('a'), literal('b')]),
+                regex.And([regex.literal('a'), regex.literal('b')]),
                 chars.CharStream.load('ab'),
                 (
                     chars.CharStream(),
-                    Result([
+                    regex.Result([
                         chars.Char('a'),
                         chars.Char('b', chars.Position(0, 1)),
                     ])
                 )
             ),
             (
-                And([literal('a'), literal('b')]),
+                regex.And([regex.literal('a'), regex.literal('b')]),
                 chars.CharStream.load('abc'),
                 (
                     chars.CharStream([
                         chars.Char('c', chars.Position(0, 2)),
                     ]),
-                    Result([
+                    regex.Result([
                         chars.Char('a'),
                         chars.Char('b', chars.Position(0, 1)),
                     ])
                 )
             ),
             (
-                And([literal('a'), literal('b')]),
+                regex.And([regex.literal('a'), regex.literal('b')]),
                 chars.CharStream.load('c'),
                 None
             ),
             (
-                And([literal('a'), literal('b')]),
+                regex.And([regex.literal('a'), regex.literal('b')]),
                 chars.CharStream.load('b'),
                 None
             ),
             (
-                Or([literal('a'), literal('b')]),
+                regex.Or([regex.literal('a'), regex.literal('b')]),
                 chars.CharStream.load('a'),
                 (
                     chars.CharStream(),
-                    Result([
+                    regex.Result([
                         chars.Char('a'),
                     ])
                 )
             ),
             (
-                Or([literal('a'), literal('b')]),
+                regex.Or([regex.literal('a'), regex.literal('b')]),
                 chars.CharStream.load('b'),
                 (
                     chars.CharStream(),
-                    Result([
+                    regex.Result([
                         chars.Char('b'),
                     ])
                 )
             ),
             (
-                Or([literal('a'), literal('b')]),
+                regex.Or([regex.literal('a'), regex.literal('b')]),
                 chars.CharStream.load('ac'),
                 (
                     chars.CharStream([
                         chars.Char('c', chars.Position(0, 1)),
                     ]),
-                    Result([
+                    regex.Result([
                         chars.Char('a'),
                     ])
                 )
             ),
             (
-                Or([literal('a'), literal('b')]),
+                regex.Or([regex.literal('a'), regex.literal('b')]),
                 chars.CharStream.load('bc'),
                 (
                     chars.CharStream([
                         chars.Char('c', chars.Position(0, 1)),
                     ]),
-                    Result([
+                    regex.Result([
                         chars.Char('b'),
                     ])
                 )
             ),
             (
-                Or([literal('a'), literal('b')]),
+                regex.Or([regex.literal('a'), regex.literal('b')]),
                 chars.CharStream.load('c'),
                 None
             ),
             (
-                ZeroOrMore(literal('a')),
+                regex.ZeroOrMore(regex.literal('a')),
                 chars.CharStream.load(''),
                 (
                     chars.CharStream(),
-                    Result([
+                    regex.Result([
                     ])
                 )
             ),
             (
-                ZeroOrMore(literal('a')),
+                regex.ZeroOrMore(regex.literal('a')),
                 chars.CharStream.load('a'),
                 (
                     chars.CharStream(),
-                    Result([
+                    regex.Result([
                         chars.Char('a'),
                     ])
                 )
             ),
             (
-                ZeroOrMore(literal('a')),
+                regex.ZeroOrMore(regex.literal('a')),
                 chars.CharStream.load('aa'),
                 (
                     chars.CharStream(),
-                    Result([
+                    regex.Result([
                         chars.Char('a'),
                         chars.Char('a', chars.Position(0, 1)),
                     ])
                 )
             ),
             (
-                ZeroOrMore(literal('a')),
+                regex.ZeroOrMore(regex.literal('a')),
                 chars.CharStream.load('b'),
                 (
                     chars.CharStream([
                         chars.Char('b', chars.Position(0, 0)),
                     ]),
-                    Result([
+                    regex.Result([
                     ])
                 )
             ),
             (
-                ZeroOrMore(literal('a')),
+                regex.ZeroOrMore(regex.literal('a')),
                 chars.CharStream.load('ab'),
                 (
                     chars.CharStream([
                         chars.Char('b', chars.Position(0, 1)),
                     ]),
-                    Result([
+                    regex.Result([
                         chars.Char('a'),
                     ])
                 )
             ),
             (
-                ZeroOrMore(literal('a')),
+                regex.ZeroOrMore(regex.literal('a')),
                 chars.CharStream.load('aab'),
                 (
                     chars.CharStream([
                         chars.Char('b', chars.Position(0, 2)),
                     ]),
-                    Result([
+                    regex.Result([
                         chars.Char('a'),
                         chars.Char('a', chars.Position(0, 1)),
                     ])
                 )
             ),
             (
-                OneOrMore(literal('a')),
+                regex.OneOrMore(regex.literal('a')),
                 chars.CharStream.load(''),
                 None
             ),
             (
-                OneOrMore(literal('a')),
+                regex.OneOrMore(regex.literal('a')),
                 chars.CharStream.load('a'),
                 (
                     chars.CharStream(),
-                    Result([
+                    regex.Result([
                         chars.Char('a'),
                     ])
                 )
             ),
             (
-                OneOrMore(literal('a')),
+                regex.OneOrMore(regex.literal('a')),
                 chars.CharStream.load('aa'),
                 (
                     chars.CharStream(),
-                    Result([
+                    regex.Result([
                         chars.Char('a'),
                         chars.Char('a', chars.Position(0, 1)),
                     ])
                 )
             ),
             (
-                OneOrMore(literal('a')),
+                regex.OneOrMore(regex.literal('a')),
                 chars.CharStream.load('b'),
                 None
             ),
             (
-                OneOrMore(literal('a')),
+                regex.OneOrMore(regex.literal('a')),
                 chars.CharStream.load('ab'),
                 (
                     chars.CharStream([
                         chars.Char('b', chars.Position(0, 1)),
                     ]),
-                    Result([
+                    regex.Result([
                         chars.Char('a'),
                     ])
                 )
             ),
             (
-                OneOrMore(literal('a')),
+                regex.OneOrMore(regex.literal('a')),
                 chars.CharStream.load('aab'),
                 (
                     chars.CharStream([
                         chars.Char('b', chars.Position(0, 2)),
                     ]),
-                    Result([
+                    regex.Result([
                         chars.Char('a'),
                         chars.Char('a', chars.Position(0, 1)),
                     ])
                 )
             ),
             (
-                ZeroOrOne(literal('a')),
+                regex.ZeroOrOne(regex.literal('a')),
                 chars.CharStream.load(''),
                 (
                     chars.CharStream(),
-                    Result([
+                    regex.Result([
                     ])
                 )
             ),
             (
-                ZeroOrOne(literal('a')),
+                regex.ZeroOrOne(regex.literal('a')),
                 chars.CharStream.load('a'),
                 (
                     chars.CharStream(),
-                    Result([
+                    regex.Result([
                         chars.Char('a'),
                     ])
                 )
             ),
             (
-                ZeroOrOne(literal('a')),
+                regex.ZeroOrOne(regex.literal('a')),
                 chars.CharStream.load('b'),
                 (
                     chars.CharStream([
                         chars.Char('b', chars.Position(0, 0)),
                     ]),
-                    Result([
+                    regex.Result([
                     ])
                 )
             ),
             (
-                ZeroOrOne(literal('a')),
+                regex.ZeroOrOne(regex.literal('a')),
                 chars.CharStream.load('ab'),
                 (
                     chars.CharStream([
                         chars.Char('b', chars.Position(0, 1)),
                     ]),
-                    Result([
+                    regex.Result([
                         chars.Char('a'),
                     ])
                 )
             ),
             (
-                UntilEmpty(literal('a')),
+                regex.UntilEmpty(regex.literal('a')),
                 chars.CharStream.load(''),
                 (
                     chars.CharStream(),
-                    Result([
+                    regex.Result([
                     ])
                 )
             ),
             (
-                UntilEmpty(literal('a')),
+                regex.UntilEmpty(regex.literal('a')),
                 chars.CharStream.load('a'),
                 (
                     chars.CharStream(),
-                    Result([
+                    regex.Result([
                         chars.Char('a'),
                     ])
                 )
             ),
             (
-                UntilEmpty(literal('a')),
+                regex.UntilEmpty(regex.literal('a')),
                 chars.CharStream.load('aa'),
                 (
                     chars.CharStream(),
-                    Result([
+                    regex.Result([
                         chars.Char('a'),
                         chars.Char('a', chars.Position(0, 1)),
                     ])
                 )
             ),
             (
-                UntilEmpty(literal('a')),
+                regex.UntilEmpty(regex.literal('a')),
                 chars.CharStream.load('b'),
                 None
             ),
             (
-                UntilEmpty(literal('a')),
+                regex.UntilEmpty(regex.literal('a')),
                 chars.CharStream.load('ab'),
                 None
             ),
             (
-                UntilEmpty(literal('a')),
+                regex.UntilEmpty(regex.literal('a')),
                 chars.CharStream.load('aab'),
                 None
             ),
             (
-                Not(literal('a')),
+                regex.Not(regex.literal('a')),
                 chars.CharStream.load('a'),
                 None,
             ),
             (
-                Not(literal('a')),
+                regex.Not(regex.literal('a')),
                 chars.CharStream.load('b'),
                 (
                     chars.CharStream(),
-                    Result([
+                    regex.Result([
                     ])
                 )
             ),
             (
-                Not(literal('a')),
+                regex.Not(regex.literal('a')),
                 chars.CharStream.load('bc'),
                 (
                     chars.CharStream([
                         chars.Char('c', chars.Position(0, 1)),
                     ]),
-                    Result([
+                    regex.Result([
                     ])
                 )
             ),
             (
-                Range('a', 'z'),
+                regex.Range('a', 'z'),
                 chars.CharStream.load('a'),
                 (
                     chars.CharStream([]),
-                    Result([
+                    regex.Result([
                         chars.Char('a'),
                     ])
                 )
             ),
             (
-                Range('a', 'z'),
+                regex.Range('a', 'z'),
                 chars.CharStream.load('ab'),
                 (
                     chars.CharStream([
                         chars.Char('b', chars.Position(0, 1)),
                     ]),
-                    Result([
+                    regex.Result([
                         chars.Char('a'),
                     ])
                 )
             ),
             (
-                Range('a', 'z'),
+                regex.Range('a', 'z'),
                 chars.CharStream.load('1'),
                 None
             ),
         ]):
-            with self.subTest(regex=regex, state=state, expected=expected):
+            with self.subTest(regex_=regex_, state=state, expected=expected):
                 if expected is None:
                     with self.assertRaises(errors.Error):
-                        regex(state)
+                        regex_(state)
                 else:
-                    self.assertEqual(regex(state), expected)
+                    self.assertEqual(regex_(state), expected)
 
     def test_loadliteral(self):
-        for val, expected in list[tuple[str, Regex]]([
+        for val, expected in list[tuple[str, regex.Regex]]([
             (
                 '',
-                And([]),
+                regex.And([]),
             ),
             (
                 'a',
-                Literal('a'),
+                regex.Literal('a'),
             ),
             (
                 'ab',
-                And([
-                    Literal('a'),
-                    Literal('b'),
+                regex.And([
+                    regex.Literal('a'),
+                    regex.Literal('b'),
                 ]),
             )
         ]):
             with self.subTest(val=val, expected=expected):
-                self.assertEqual(literal(val), expected)
+                self.assertEqual(regex.literal(val), expected)
