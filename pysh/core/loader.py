@@ -3,7 +3,7 @@ from . import regex, lexer, parser, tokens
 
 
 def load_regex(input: str) -> regex.Regex:
-    operators = '()|[-]^*+?!\\'
+    operators = '()|[-]^*+?!\\~'
     lexer_ = lexer.Lexer([
         lexer.Rule(operator, regex.literal(operator))
         for operator in operators
@@ -14,7 +14,7 @@ def load_regex(input: str) -> regex.Regex:
 
     def load_and(state: tokens.TokenStream, scope: parser.Scope[regex.Regex]) -> parser.StateAndResult[regex.Regex]:
         state, _ = state.pop('(')
-        state, rules = parser.OneOrMore[regex.Regex](load_rule)(state, scope)
+        state, rules = parser.OneOrMore[regex.Regex](load_regex)(state, scope)
         state, _ = state.pop(')')
         if len(rules) == 1:
             return state, rules[0]
@@ -23,10 +23,10 @@ def load_regex(input: str) -> regex.Regex:
     def load_or(state: tokens.TokenStream, scope: parser.Scope[regex.Regex]) -> parser.StateAndResult[regex.Regex]:
         def load_tail(state: tokens.TokenStream, scope: parser.Scope[regex.Regex]) -> parser.StateAndResult[regex.Regex]:
             state, _ = state.pop('|')
-            return load_rule(state, scope)
+            return load_regex(state, scope)
 
         state, _ = state.pop('(')
-        state, head = load_rule(state, scope)
+        state, head = load_regex(state, scope)
         state, tails = parser.OneOrMore[regex.Regex](load_tail)(state, scope)
         state, _ = state.pop(')')
         return state, regex.Or([head] + list(tails))
@@ -36,9 +36,9 @@ def load_regex(input: str) -> regex.Regex:
 
     def load_postfix(operator: str, type: Type[regex.UnaryRegex]) -> parser.Rule[regex.Regex]:
         def inner(state: tokens.TokenStream, scope: parser.Scope[regex.Regex]) -> parser.StateAndResult[regex.Regex]:
-            state, rule = load_operand(state, scope)
+            state, regex = load_operand(state, scope)
             state, _ = state.pop(operator)
-            return state, type(rule)
+            return state, type(regex)
         return inner
 
     load_zero_or_more = load_postfix('*', regex.ZeroOrMore)
@@ -46,10 +46,15 @@ def load_regex(input: str) -> regex.Regex:
     load_zero_or_one = load_postfix('?', regex.ZeroOrOne)
     load_until_empty = load_postfix('!', regex.UntilEmpty)
 
-    def load_not(state: tokens.TokenStream, scope: parser.Scope[regex.Regex]) -> parser.StateAndResult[regex.Regex]:
-        state, _ = state.pop('^')
-        state, rule = load_rule(state, scope)
-        return state, regex.Not(rule)
+    def load_prefix(operator: str, type: Type[regex.UnaryRegex]) -> parser.Rule[regex.Regex]:
+        def inner(state: tokens.TokenStream, scope: parser.Scope[regex.Regex]) -> parser.StateAndResult[regex.Regex]:
+            state, _ = state.pop(operator)
+            state, regex = load_operand(state, scope)
+            return state, type(regex)
+        return inner
+
+    load_not = load_prefix('^', regex.Not)
+    load_skip = load_prefix('~', regex.Skip)
 
     def load_range(state: tokens.TokenStream, scope: parser.Scope[regex.Regex]) -> parser.StateAndResult[regex.Regex]:
         state, _ = state.pop('[')
@@ -59,16 +64,24 @@ def load_regex(input: str) -> regex.Regex:
         state, _ = state.pop(']')
         return state, regex.Range(start, end)
 
+    def load_special(state: tokens.TokenStream, scope: parser.Scope[regex.Regex]) -> parser.StateAndResult[regex.Regex]:
+        state, _ = state.pop('\\')
+        state, val = parser.token_val(state)
+        if val == 'w':
+            return state, regex.Whitespace()
+        else:
+            return state, regex.literal(val)
+
     load_operation = parser.Or[regex.Regex](
-        [load_zero_or_more, load_one_or_more, load_zero_or_one, load_until_empty, load_not])
+        [load_zero_or_more, load_one_or_more, load_zero_or_one, load_until_empty, load_not, load_skip])
 
     load_operand = parser.Or[regex.Regex](
-        [load_range, load_or, load_and, load_literal])
+        [load_range, load_or, load_and, load_special, load_literal])
 
-    load_rule = parser.Or[regex.Regex]([load_operation, load_operand])
+    load_regex = parser.Or[regex.Regex]([load_operation, load_operand])
 
     _, rules = parser.UntilEmpty[regex.Regex](
-        load_rule)(tokens_, parser.Scope[regex.Regex]())
+        load_regex)(tokens_, parser.Scope[regex.Regex]())
     if len(rules) == 1:
         return rules[0]
     else:

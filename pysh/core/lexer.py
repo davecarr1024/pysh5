@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Iterable, Iterator, MutableSequence, Sequence, Sized
 from . import chars, errors, regex, tokens
 
@@ -11,7 +11,7 @@ class RuleError(errors.UnaryError):
     state: chars.CharStream
 
     def _repr_line(self) -> str:
-        return f'lexer.RuleError(rule={self.rule},state={self.state}, msg={self.msg})'
+        return f'RuleError(rule={self.rule},state={self.state}, msg={self.msg})'
 
     def __repr__(self) -> str:
         return self._repr(0)
@@ -47,7 +47,7 @@ class Rule:
 
 @dataclass(frozen=True)
 class Lexer(Sized, Iterable[Rule]):
-    rules: Sequence[Rule]
+    rules: Sequence[Rule] = field(default_factory=list[Rule])
 
     def __str__(self) -> str:
         return f"Lexer({','.join([str(rule) for rule in self.rules])})"
@@ -76,5 +76,10 @@ class Lexer(Sized, Iterable[Rule]):
         tokens_: MutableSequence[tokens.Token] = []
         while state:
             state, token = self._apply_any(state)
-            tokens_.append(token)
+            if token.val:
+                tokens_.append(token)
         return tokens.TokenStream(tokens_)
+
+    @staticmethod
+    def literals(vals: Sequence[str]) -> 'Lexer':
+        return Lexer([Rule(val, regex.literal(val)) for val in vals])

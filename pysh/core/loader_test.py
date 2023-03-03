@@ -50,8 +50,20 @@ class LoaderTest(TestCase):
                 regex.Not(regex.literal('a')),
             ),
             (
+                '~a',
+                regex.Skip(regex.literal('a')),
+            ),
+            (
                 '[a-z]',
                 regex.Range('a', 'z'),
+            ),
+            (
+                '\\-',
+                regex.literal('-'),
+            ),
+            (
+                '~(\\w+)',
+                regex.Skip(regex.OneOrMore(regex.Whitespace())),
             ),
         ]):
             with self.subTest(input=input, expected=expected):

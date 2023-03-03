@@ -53,6 +53,10 @@ class ResultTest(TestCase):
     def test_position(self):
         for result, expected in list[tuple[regex.Result, chars.Position]]([
             (
+                regex.Result(),
+                chars.Position(),
+            ),
+            (
                 regex.Result([
                     chars.Char('a', chars.Position(1, 2)),
                 ]),
@@ -68,10 +72,6 @@ class ResultTest(TestCase):
         ]):
             with self.subTest(result=result, expected=expected):
                 self.assertEqual(result.position(), expected)
-
-    def test_position_fail(self):
-        with self.assertRaises(errors.Error):
-            regex.Result().position()
 
     def test_val(self):
         for result, expected in list[tuple[regex.Result, str]]([
@@ -507,6 +507,16 @@ class RegexTest(TestCase):
                 regex.Range('a', 'z'),
                 chars.CharStream.load('1'),
                 None
+            ),
+            (
+                regex.Skip(regex.literal('ab')),
+                chars.CharStream.load('abc'),
+                (
+                    chars.CharStream([
+                        chars.Char('c', chars.Position(0, 2)),
+                    ]),
+                    regex.Result(),
+                )
             ),
         ]):
             with self.subTest(regex_=regex_, state=state, expected=expected):

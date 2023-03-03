@@ -10,7 +10,7 @@ class Error(Exception):
         return f'Error(msg={repr(self.msg)})'
 
     def _repr(self, indent: int) -> str:
-        return f"{'  '*indent}\n{self._repr_line()}"
+        return f"\n{'  '*indent}{self._repr_line()}"
 
     def __str__(self) -> str:
         return repr(self)

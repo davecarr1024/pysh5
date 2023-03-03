@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Sequence
 from unittest import TestCase
 from . import chars, errors, lexer, regex, tokens
 
@@ -42,6 +42,23 @@ class LexerTest(TestCase):
                 'c',
                 None
             ),
+            (
+                lexer.Lexer([
+                    lexer.Rule('r', regex.literal('a')),
+                    lexer.Rule('s', regex.literal('b')),
+                    lexer.Rule(
+                        'ws',
+                        regex.Skip(
+                            regex.Whitespace()
+                        )
+                    ),
+                ]),
+                'a b',
+                tokens.TokenStream([
+                    tokens.Token('r', 'a', chars.Position(0, 0)),
+                    tokens.Token('s', 'b', chars.Position(0, 2)),
+                ])
+            ),
         ]):
             with self.subTest(lexer_=lexer_, state=state, expected=expected):
                 if expected is None:
@@ -49,3 +66,28 @@ class LexerTest(TestCase):
                         lexer_(state)
                 else:
                     self.assertEqual(lexer_(state), expected)
+
+    def test_literals(self):
+        for vals, expected in list[tuple[Sequence[str], lexer.Lexer]]([
+            (
+                [],
+                lexer.Lexer(),
+            ),
+            (
+                'abc',
+                lexer.Lexer([
+                    lexer.Rule('a', regex.literal('a')),
+                    lexer.Rule('b', regex.literal('b')),
+                    lexer.Rule('c', regex.literal('c')),
+                ]),
+            ),
+            (
+                ['ab', 'cd'],
+                lexer.Lexer([
+                    lexer.Rule('ab', regex.literal('ab')),
+                    lexer.Rule('cd', regex.literal('cd')),
+                ]),
+            ),
+        ]):
+            with self.subTest(vals=vals, expected=expected):
+                self.assertEqual(lexer.Lexer.literals(vals), expected)

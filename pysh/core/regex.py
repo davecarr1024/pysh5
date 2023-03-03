@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
+import string
 from typing import Callable, Iterable, Iterator, MutableSequence, Sequence, Sized
 from . import chars, errors, tokens
 
@@ -31,7 +32,7 @@ class Result(Sized, Iterable[chars.Char]):
 
     def position(self) -> chars.Position:
         if not self:
-            raise errors.Error(msg='position from empty regex result')
+            return chars.Position()
         return list(self.chars_)[0].position
 
     def val(self) -> str:
@@ -215,3 +216,25 @@ class Not(UnaryRegex):
         except errors.Error:
             return state.tail(), Result()
         raise RegexError(regex=self, state=state)
+
+
+@dataclass(frozen=True)
+class Skip(UnaryRegex):
+    def __str__(self) -> str:
+        return f'~{self.child}'
+
+    def __call__(self, state: chars.CharStream) -> StateAndResult:
+        try:
+            state, _ = self.child(state)
+            return state, Result()
+        except errors.Error as error:
+            raise RegexError(regex=self, state=state, children=[error])
+
+
+@dataclass(frozen=True)
+class Whitespace(_AbstractRegex):
+    def __str__(self) -> str:
+        return '\\w'
+
+    def __call__(self, state: chars.CharStream) -> StateAndResult:
+        return Or([literal(c) for c in string.whitespace])(state)
