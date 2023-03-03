@@ -15,6 +15,10 @@ class PypeTest(TestCase):
                 'a = 1; a;',
                 builtins_.int_(1),
             ),
+            (
+                'a = 1; { a = 2; } a;',
+                builtins_.int_(1),
+            ),
         ]):
             with self.subTest(input=input, expected=expected):
                 if expected is None:

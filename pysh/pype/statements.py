@@ -73,6 +73,7 @@ class Block(Statement, Sized, Iterable[Statement]):
         return iter(self.statements)
 
     def eval(self, scope: vals.Scope) -> Statement.Result:
+        scope = vals.Scope(parent=scope)
         for statement in self.statements:
             result = statement.eval(scope)
             if result.is_return():
