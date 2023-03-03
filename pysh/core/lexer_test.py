@@ -91,3 +91,96 @@ class LexerTest(TestCase):
         ]):
             with self.subTest(vals=vals, expected=expected):
                 self.assertEqual(lexer.Lexer.literals(vals), expected)
+
+    def test_or(self):
+        for lhs, rhs, expected in list[tuple[lexer.Lexer, lexer.Lexer, Optional[lexer.Lexer]]]([
+            (
+                lexer.Lexer([]),
+                lexer.Lexer([]),
+                lexer.Lexer([]),
+            ),
+            (
+                lexer.Lexer([
+                    lexer.Rule.load('r', 'a'),
+                ]),
+                lexer.Lexer([]),
+                lexer.Lexer([
+                    lexer.Rule.load('r', 'a'),
+                ]),
+            ),
+            (
+                lexer.Lexer([
+                ]),
+                lexer.Lexer([
+                    lexer.Rule.load('r', 'a'),
+                ]),
+                lexer.Lexer([
+                    lexer.Rule.load('r', 'a'),
+                ]),
+            ),
+            (
+                lexer.Lexer([
+                    lexer.Rule.load('r', 'a'),
+                ]),
+                lexer.Lexer([
+                    lexer.Rule.load('r', 'a'),
+                ]),
+                lexer.Lexer([
+                    lexer.Rule.load('r', 'a'),
+                ]),
+            ),
+            (
+                lexer.Lexer([
+                    lexer.Rule.load('r', 'a'),
+                ]),
+                lexer.Lexer([
+                    lexer.Rule.load('r', 'b'),
+                ]),
+                None,
+            ),
+            (
+                lexer.Lexer([
+                    lexer.Rule.load('r', 'a'),
+                ]),
+                lexer.Lexer([
+                    lexer.Rule.load('s', 'b'),
+                ]),
+                lexer.Lexer([
+                    lexer.Rule.load('r', 'a'),
+                    lexer.Rule.load('s', 'b'),
+                ]),
+            ),
+            (
+                lexer.Lexer([
+                    lexer.Rule.load('s', 'b'),
+                ]),
+                lexer.Lexer([
+                    lexer.Rule.load('r', 'a'),
+                ]),
+                lexer.Lexer([
+                    lexer.Rule.load('s', 'b'),
+                    lexer.Rule.load('r', 'a'),
+                ]),
+            ),
+            (
+                lexer.Lexer([
+                    lexer.Rule.load('r', 'a'),
+                    lexer.Rule.load('s', 'b'),
+                ]),
+                lexer.Lexer([
+                    lexer.Rule.load('t', 'c'),
+                    lexer.Rule.load('s', 'b'),
+                ]),
+                lexer.Lexer([
+                    lexer.Rule.load('r', 'a'),
+                    lexer.Rule.load('s', 'b'),
+                    lexer.Rule.load('t', 'c'),
+                ]),
+            ),
+        ]):
+            with self.subTest(lhs=lhs, rhs=rhs, expected=expected):
+                if expected is None:
+                    with self.assertRaises(errors.Error):
+                        _ = lhs | rhs
+                else:
+                    self.assertEqual(lhs | rhs, expected)

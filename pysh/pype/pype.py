@@ -4,7 +4,7 @@ from ..core import errors, lexer, loader, parser, tokens
 
 
 def eval(input: str, scope: Optional[vals.Scope] = None) -> vals.Val:
-    lexer_ = lexer.Lexer.literals(list(';={}(),') + ['return']) + lexer.Lexer([
+    lexer_ = lexer.Lexer.literals(list(';={}(),') + ['return']) | lexer.Lexer([
         lexer.Rule('id', loader.load_regex(
             '([a-z]|[A-Z]|_)([a-z]|[A-Z]|[0-9]|_)*')),
         lexer.Rule('int', loader.load_regex('(\\-)?[0-9]+')),

@@ -27,41 +27,19 @@ class IntTest(TestCase):
 
 class ObjectTest(TestCase):
     def test_load(self):
-        for state, expected in list[tuple[tokens.TokenStream, Optional[parser.StateAndResult[classes.Object]]]]([
+        for state, expected in list[tuple[str, Optional[parser.StateAndResult[classes.Object]]]]([
             (
-                tokens.TokenStream([
-                    tokens.Token('int', '1'),
-                ]),
+                '1',
                 (
                     tokens.TokenStream([]),
                     builtins_.int_(1),
                 ),
             ),
-            (
-                tokens.TokenStream([
-                    tokens.Token('none', 'none'),
-                ]),
-                (
-                    tokens.TokenStream([]),
-                    builtins_.none,
-                ),
-            ),
-            (
-                tokens.TokenStream([]),
-                None,
-            ),
-            (
-                tokens.TokenStream([
-                    tokens.Token('r', 'a'),
-                ]),
-                None,
-            ),
         ]):
             with self.subTest(state=state, expected=expected):
                 if expected is None:
                     with self.assertRaises(errors.Error):
-                        builtins_.Object.load(
-                            state, parser.Scope[classes.Object]())
+                        builtins_.Object.parser_()(builtins_.Object.lexer_()(state))
                 else:
-                    self.assertEqual(builtins_.Object.load(
-                        state, parser.Scope[classes.Object]()), expected)
+                    self.assertEqual(builtins_.Object.parser_()(
+                        builtins_.Object.lexer_()(state)), expected)

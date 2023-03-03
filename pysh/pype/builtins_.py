@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 import operator
 from typing import Any, Callable, Generic, Mapping, Type, TypeVar
-from ..core import errors, parser, tokens
+from ..core import errors, lexer, loader, parser, regex, tokens
 from . import classes, funcs, vals
 
 
@@ -45,10 +45,29 @@ class Object(classes.Object, ABC):
     def from_val(cls, scope: vals.Scope, val: vals.Val) -> Any:
         ...
 
+    @staticmethod
+    def parser_() -> parser.Parser[classes.Object]:
+        return parser.Parser[classes.Object](
+            'object',
+            parser.Scope[classes.Object]({
+                'object': Object.load,
+                'int': _IntObject.load,
+                'none': _NoneObject.load,
+            })
+        )
+
     @classmethod
     @abstractmethod
     def load(cls, state: tokens.TokenStream, scope: parser.Scope[classes.Object]) -> parser.StateAndResult[classes.Object]:
-        return parser.Or[classes.Object]([_IntObject.load, _NoneObject.load])(state, scope)
+        return parser.Or[classes.Object]([
+            parser.Ref[classes.Object]('int'),
+            parser.Ref[classes.Object]('none'),
+        ])(state, scope)
+
+    @classmethod
+    @abstractmethod
+    def lexer_(cls) -> lexer.Lexer:
+        return _IntObject.lexer_() | _NoneObject.lexer_()
 
 
 _BuiltinValue = TypeVar('_BuiltinValue')
@@ -102,6 +121,10 @@ class _IntObject(_ValueObject[int]):
     def load(cls, state: tokens.TokenStream, scope: parser.Scope[classes.Object]) -> parser.StateAndResult[classes.Object]:
         return parser.Literal[classes.Object]('int', lambda token: int_(int(token.val)))(state, scope)
 
+    @classmethod
+    def lexer_(cls) -> lexer.Lexer:
+        return lexer.Lexer([lexer.Rule('int', loader.load_regex('(\\-)?[0-9]+'))])
+
 
 _IntClass = _Class(
     'int',
@@ -124,6 +147,10 @@ class _NoneObject(Object):
     @classmethod
     def load(cls, state: tokens.TokenStream, scope: parser.Scope[classes.Object]) -> parser.StateAndResult[classes.Object]:
         return parser.Literal[classes.Object]('none', lambda _: none)(state, scope)
+
+    @classmethod
+    def lexer_(cls) -> lexer.Lexer:
+        return lexer.Lexer([lexer.Rule('none', regex.literal('none'))])
 
 
 _NoneClass = _Class(

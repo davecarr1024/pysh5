@@ -464,3 +464,47 @@ class ArgsTest(TestCase):
                             state, parser.Scope[exprs.Args]()),
                         expected
                     )
+
+    def test_load_str(self):
+        for state, expected in list[tuple[str, parser.StateAndResult[exprs.Args]]]([
+            (
+                '()',
+                (
+                    tokens.TokenStream([]),
+                    exprs.Args(),
+                ),
+            ),
+            (
+                '(a)',
+                (
+                    tokens.TokenStream([]),
+                    exprs.Args([
+                        exprs.Arg(
+                            exprs.ref('a')
+                        ),
+                    ]),
+                ),
+            ),
+            (
+                '(a, b)',
+                (
+                    tokens.TokenStream([]),
+                    exprs.Args([
+                        exprs.Arg(
+                            exprs.ref('a')
+                        ),
+                        exprs.Arg(
+                            exprs.ref('b')
+                        ),
+                    ]),
+                ),
+            ),
+        ]):
+            with self.subTest(state=state, expected=expected):
+                self.assertEqual(
+                    exprs.Args.loader(
+                        exprs.Expr.parser_().scope
+                    )(
+                        exprs.Args.lexer_()(state),
+                        parser.Scope[exprs.Args](),
+                    ), expected)

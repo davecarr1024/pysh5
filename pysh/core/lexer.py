@@ -1,3 +1,4 @@
+from collections import OrderedDict
 from dataclasses import dataclass, field
 from typing import Iterable, Iterator, MutableSequence, Sequence, Sized
 from . import chars, errors, regex, tokens
@@ -44,6 +45,12 @@ class Rule:
         except errors.Error as error:
             raise RuleError(rule=self, state=state, child=error)
 
+    @staticmethod
+    def load(rule_name: str, regex_: str | regex.Regex) -> 'Rule':
+        if isinstance(regex_, str):
+            regex_ = regex.load(regex_)
+        return Rule(rule_name, regex_)
+
 
 @dataclass(frozen=True)
 class Lexer(Sized, Iterable[Rule]):
@@ -58,8 +65,26 @@ class Lexer(Sized, Iterable[Rule]):
     def __iter__(self) -> Iterator[Rule]:
         return iter(self.rules)
 
-    def __add__(self, rhs: 'Lexer') -> 'Lexer':
-        return Lexer(list(self.rules)+list(rhs.rules))
+    def _rules_dict(self) -> OrderedDict[str, regex.Regex]:
+        rules = OrderedDict[str, regex.Regex]()
+        for rule in self.rules:
+            rules[rule.name] = rule.regex_
+        return rules
+
+    def __or__(self, rhs: 'Lexer') -> 'Lexer':
+        lhs_rules = self._rules_dict()
+        rhs_rules = rhs._rules_dict()
+        for rule_name in set(lhs_rules.keys()) & set(rhs_rules.keys()):
+            lhs_rule = lhs_rules[rule_name]
+            rhs_rule = rhs_rules[rule_name]
+            if lhs_rule != rhs_rule:
+                raise errors.Error(
+                    msg=f'redefining lex rule {rule_name}: {lhs_rule} != {rhs_rule}')
+        return Lexer.load(**(lhs_rules | rhs_rules))
+
+    @staticmethod
+    def load(**regexes: str | regex.Regex) -> 'Lexer':
+        return Lexer([Rule.load(rule_name, regex) for rule_name, regex in regexes.items()])
 
     def _apply_any(self, state: chars.CharStream) -> StateAndResult:
         errors_: MutableSequence[errors.Error] = []

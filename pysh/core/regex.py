@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 import string
-from typing import Callable, Iterable, Iterator, MutableSequence, Sequence, Sized
+from typing import Callable, Iterable, Iterator, MutableSequence, Sequence, Sized, Type
 from . import chars, errors, tokens
 
 
@@ -238,3 +238,91 @@ class Whitespace(_AbstractRegex):
 
     def __call__(self, state: chars.CharStream) -> StateAndResult:
         return Or([literal(c) for c in string.whitespace])(state)
+
+
+def load(input: str) -> Regex:
+    from . import lexer, parser
+
+    operators = '()|[-]^*+?!\\~'
+    lexer_ = lexer.Lexer([
+        lexer.Rule(operator, literal(operator))
+        for operator in operators
+    ]+[
+        lexer.Rule('literal', Any())
+    ])
+    tokens_ = lexer_(input)
+
+    def load_and(state: tokens.TokenStream, scope: parser.Scope[Regex]) -> parser.StateAndResult[Regex]:
+        state, _ = state.pop('(')
+        state, rules = parser.OneOrMore[Regex](load_regex)(state, scope)
+        state, _ = state.pop(')')
+        if len(rules) == 1:
+            return state, rules[0]
+        return state, And(rules)
+
+    def load_or(state: tokens.TokenStream, scope: parser.Scope[Regex]) -> parser.StateAndResult[Regex]:
+        def load_tail(state: tokens.TokenStream, scope: parser.Scope[Regex]) -> parser.StateAndResult[Regex]:
+            state, _ = state.pop('|')
+            return load_regex(state, scope)
+
+        state, _ = state.pop('(')
+        state, head = load_regex(state, scope)
+        state, tails = parser.OneOrMore[Regex](load_tail)(state, scope)
+        state, _ = state.pop(')')
+        return state, Or([head] + list(tails))
+
+    load_literal = parser.Literal[Regex](
+        'literal', lambda token: literal(token.val))
+
+    def load_postfix(operator: str, type: Type[UnaryRegex]) -> parser.Rule[Regex]:
+        def inner(state: tokens.TokenStream, scope: parser.Scope[Regex]) -> parser.StateAndResult[Regex]:
+            state, regex = load_operand(state, scope)
+            state, _ = state.pop(operator)
+            return state, type(regex)
+        return inner
+
+    load_zero_or_more = load_postfix('*', ZeroOrMore)
+    load_one_or_more = load_postfix('+', OneOrMore)
+    load_zero_or_one = load_postfix('?', ZeroOrOne)
+    load_until_empty = load_postfix('!', UntilEmpty)
+
+    def load_prefix(operator: str, type: Type[UnaryRegex]) -> parser.Rule[Regex]:
+        def inner(state: tokens.TokenStream, scope: parser.Scope[Regex]) -> parser.StateAndResult[Regex]:
+            state, _ = state.pop(operator)
+            state, regex = load_operand(state, scope)
+            return state, type(regex)
+        return inner
+
+    load_not = load_prefix('^', Not)
+    load_skip = load_prefix('~', Skip)
+
+    def load_range(state: tokens.TokenStream, scope: parser.Scope[Regex]) -> parser.StateAndResult[Regex]:
+        state, _ = state.pop('[')
+        state, start = parser.token_val(state, rule_name='literal')
+        state, _ = state.pop('-')
+        state, end = parser.token_val(state, rule_name='literal')
+        state, _ = state.pop(']')
+        return state, Range(start, end)
+
+    def load_special(state: tokens.TokenStream, scope: parser.Scope[Regex]) -> parser.StateAndResult[Regex]:
+        state, _ = state.pop('\\')
+        state, val = parser.token_val(state)
+        if val == 'w':
+            return state, Whitespace()
+        else:
+            return state, literal(val)
+
+    load_operation = parser.Or[Regex](
+        [load_zero_or_more, load_one_or_more, load_zero_or_one, load_until_empty, load_not, load_skip])
+
+    load_operand = parser.Or[Regex](
+        [load_range, load_or, load_and, load_special, load_literal])
+
+    load_regex = parser.Or[Regex]([load_operation, load_operand])
+
+    _, rules = parser.UntilEmpty[Regex](
+        load_regex)(tokens_, parser.Scope[Regex]())
+    if len(rules) == 1:
+        return rules[0]
+    else:
+        return And(rules)
