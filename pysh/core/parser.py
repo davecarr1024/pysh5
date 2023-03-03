@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Callable, Generic, Iterator, Mapping, MutableSequence, Optional, Sequence,  TypeVar
-from . import errors, tokens
+from . import errors, lexer, tokens
 
 _Result = TypeVar('_Result')
 
@@ -50,6 +50,17 @@ class MultipleResultRuleError(Generic[_Result], StateError):
         return self._repr(0)
 
 
+@dataclass(frozen=True, kw_only=True, repr=False)
+class ParseError(errors.UnaryError):
+    rule_name: str
+
+    def _repr_line(self) -> str:
+        return f'ParseError(rule_name={self.rule_name},msg={repr(self.msg)})'
+
+    def __repr__(self) -> str:
+        return self._repr(0)
+
+
 @dataclass(frozen=True)
 class Scope(Generic[_Result]):
     rules: Mapping[str, Rule[_Result]] = field(
@@ -92,16 +103,25 @@ class AbstractOptionalResultRule(ABC, Generic[_Result]):
 class Ref(AbstractRule[_Result]):
     rule_name: str
 
+    def __str__(self) -> str:
+        return self.rule_name
+
     def __call__(self, state: tokens.TokenStream, scope: Scope[_Result]) -> StateAndResult[_Result]:
         if self.rule_name not in scope:
             raise RuleError(rule=self, state=state,
                             msg=f'unknown rule {self.rule_name}')
-        return scope[self.rule_name](state, scope)
+        try:
+            return scope[self.rule_name](state, scope)
+        except errors.Error as error:
+            raise ParseError(rule_name=self.rule_name, child=error)
 
 
 @dataclass(frozen=True)
 class AbstractLiteral(AbstractRule[_Result]):
     rule_name: str
+
+    def __str__(self) -> str:
+        return f'literal({self.rule_name})'
 
     @abstractmethod
     def result(self, token: tokens.Token) -> _Result:
@@ -133,6 +153,9 @@ def token_val(state: tokens.TokenStream, scope: Scope[str] | None = None, rule_n
 class And(AbstractMultipleResultRule[_Result]):
     children: Sequence[Rule[_Result]]
 
+    def __str__(self) -> str:
+        return f"({' '.join(map(str,self.children))})"
+
     def __call__(self, state: tokens.TokenStream, scope: Scope[_Result]) -> StateAndMultipleResult[_Result]:
         results: MutableSequence[_Result] = []
         for child in self.children:
@@ -149,6 +172,9 @@ class And(AbstractMultipleResultRule[_Result]):
 class Or(AbstractRule[_Result]):
     children: Sequence[Rule[_Result]]
 
+    def __str__(self) -> str:
+        return f"({' | '.join(map(str,self.children))})"
+
     def __call__(self, state: tokens.TokenStream, scope: Scope[_Result]) -> StateAndResult[_Result]:
         child_errors: MutableSequence[errors.Error] = []
         for child in self.children:
@@ -163,6 +189,9 @@ class Or(AbstractRule[_Result]):
 class ZeroOrMore(AbstractMultipleResultRule[_Result]):
     child: Rule[_Result]
 
+    def __str__(self) -> str:
+        return f'{self.child}*'
+
     def __call__(self, state: tokens.TokenStream, scope: Scope[_Result]) -> StateAndMultipleResult[_Result]:
         results: MutableSequence[_Result] = []
         while True:
@@ -176,6 +205,9 @@ class ZeroOrMore(AbstractMultipleResultRule[_Result]):
 @dataclass(frozen=True)
 class OneOrMore(AbstractMultipleResultRule[_Result]):
     child: Rule[_Result]
+
+    def __str__(self) -> str:
+        return f'{self.child}+'
 
     def __call__(self, state: tokens.TokenStream, scope: Scope[_Result]) -> StateAndMultipleResult[_Result]:
         try:
@@ -196,6 +228,9 @@ class OneOrMore(AbstractMultipleResultRule[_Result]):
 class ZeroOrOne(AbstractOptionalResultRule[_Result]):
     child: Rule[_Result]
 
+    def __str__(self) -> str:
+        return f'{self.child}?'
+
     def __call__(self, state: tokens.TokenStream, scope: Scope[_Result]) -> StateAndOptionalResult[_Result]:
         try:
             return self.child(state, scope)
@@ -206,6 +241,9 @@ class ZeroOrOne(AbstractOptionalResultRule[_Result]):
 @dataclass(frozen=True)
 class UntilEmpty(AbstractMultipleResultRule[_Result]):
     child: Rule[_Result]
+
+    def __str__(self) -> str:
+        return f'{self.child}!'
 
     def __call__(self, state: tokens.TokenStream, scope: Scope[_Result]) -> StateAndMultipleResult[_Result]:
         results: MutableSequence[_Result] = []
@@ -241,4 +279,7 @@ class Parser(Generic[_Result], AbstractRule[_Result], Mapping[str, Rule[_Result]
     ) -> StateAndResult[_Result]:
         scope = scope or self.scope
         rule_name = rule_name or self.root_rule_name
-        return self.scope[rule_name](state, scope)
+        try:
+            return self.scope[rule_name](state, scope)
+        except errors.Error as error:
+            raise ParseError(rule_name=rule_name, child=error)

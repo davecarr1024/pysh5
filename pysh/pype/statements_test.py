@@ -78,7 +78,10 @@ class StatementTest(TestCase):
         for state, expected in list[tuple[tokens.TokenStream, Optional[parser.StateAndResult[statements.Statement]]]]([
             (
                 tokens.TokenStream([]),
-                None,
+                (
+                    tokens.TokenStream([]),
+                    statements.Block(),
+                ),
             ),
             (
                 tokens.TokenStream([

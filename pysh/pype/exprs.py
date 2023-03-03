@@ -17,7 +17,7 @@ class Expr(ABC):
             parser.Scope[Expr]({
                 'expr': Expr.load,
                 'ref': Ref.load,
-            })
+            }),
         )
 
     @classmethod
@@ -30,7 +30,7 @@ class Expr(ABC):
     @classmethod
     @abstractmethod
     def lexer_(cls) -> lexer.Lexer:
-        return Ref.lexer_()
+        return lex_rules.lexer_ | Ref.lexer_()
 
 
 @dataclass(frozen=True)

@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Iterable, Iterator, Optional, Sequence, Sized
-from . import exprs, vals
-from ..core import errors, parser, tokens
+from typing import Iterable, Iterator, MutableSequence, Optional, Sequence, Sized
+from . import exprs, lex_rules, vals
+from ..core import errors, lexer, parser, tokens
 
 
 class Statement(ABC):
@@ -40,15 +40,24 @@ class Statement(ABC):
 
     @staticmethod
     def parser_() -> parser.Parser['Statement']:
+        def load_statements(state: tokens.TokenStream, scope: parser.Scope[Statement]) -> parser.StateAndResult[Statement]:
+            state, statements = parser.UntilEmpty[Statement](
+                parser.Ref[Statement]('statement'))(state, scope)
+            if len(statements) == 1:
+                return state, statements[0]
+            else:
+                return state, Block(statements)
+
         return parser.Parser[Statement](
-            'statement',
+            'statements',
             parser.Scope[Statement]({
+                'statements': load_statements,
                 'statement': Statement.load,
                 'block': Block.load,
                 'return': Return.load,
                 'assignment': Assignment.load,
                 'expr_statement': ExprStatement.load,
-            })
+            }),
         )
 
     @classmethod
@@ -60,6 +69,11 @@ class Statement(ABC):
             parser.Ref[Statement]('assignment'),
             parser.Ref[Statement]('expr_statement'),
         ])(state, scope)
+
+    @classmethod
+    @abstractmethod
+    def lexer_(cls) -> lexer.Lexer:
+        return lex_rules.lexer_ | Block.lexer_() | Return.lexer_() | Assignment.lexer_() | ExprStatement.lexer_()
 
 
 @dataclass(frozen=True)
@@ -83,10 +97,20 @@ class Block(Statement, Sized, Iterable[Statement]):
     @classmethod
     def load(cls, state: tokens.TokenStream, scope: parser.Scope[Statement]) -> parser.StateAndResult[Statement]:
         state, _ = state.pop('{')
-        state, statements = parser.ZeroOrMore[Statement](
-            Statement.load)(state, scope)
+        statements: MutableSequence[Statement] = []
+        while state.head().rule_name != '}':
+            try:
+                state, statement = parser.Ref[Statement](
+                    'statement')(state, scope)
+                statements.append(statement)
+            except errors.Error as error:
+                raise parser.StateError(state=state, children=[error])
         state, _ = state.pop('}')
         return state, Block(statements)
+
+    @classmethod
+    def lexer_(cls) -> lexer.Lexer:
+        return lexer.Lexer.literals(['{', '}'])
 
 
 @dataclass(frozen=True)
@@ -102,6 +126,10 @@ class ExprStatement(Statement):
         state, val = exprs.Expr.parser_()(state)
         state, _ = state.pop(';')
         return state, ExprStatement(val)
+
+    @classmethod
+    def lexer_(cls) -> lexer.Lexer:
+        return exprs.Expr.lexer_() | lexer.Lexer.literals([';'])
 
 
 @dataclass(frozen=True)
@@ -122,6 +150,10 @@ class Assignment(Statement):
         assert isinstance(ref, exprs.Ref)
         return state, Assignment(ref, val)
 
+    @classmethod
+    def lexer_(cls) -> lexer.Lexer:
+        return exprs.Expr.lexer_() | lexer.Lexer.literals([';', '='])
+
 
 @dataclass(frozen=True)
 class Return(Statement):
@@ -137,3 +169,7 @@ class Return(Statement):
             exprs.Expr.parser_())(state, exprs.Expr.parser_().scope)
         state, _ = state.pop(';')
         return state, Return(val)
+
+    @classmethod
+    def lexer_(cls) -> lexer.Lexer:
+        return exprs.Expr.lexer_() | lexer.Lexer.literals([';', 'return'])

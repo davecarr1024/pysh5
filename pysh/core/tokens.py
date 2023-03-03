@@ -9,6 +9,9 @@ class Token:
     val: str
     position: chars.Position = field(default_factory=chars.Position)
 
+    def __str__(self) -> str:
+        return f'{self.rule_name}({self.val})'
+
     @staticmethod
     def load(rule_name: str, val: Sequence[chars.Char] | chars.CharStream) -> 'Token':
         if isinstance(val, chars.CharStream):
@@ -21,6 +24,9 @@ class Token:
 @dataclass(frozen=True)
 class TokenStream(Sized, Iterable[Token]):
     tokens: Sequence[Token] = field(default_factory=list[Token])
+
+    def __str__(self) -> str:
+        return f"[{', '.join(map(str,self.tokens))}]"
 
     def __bool__(self) -> bool:
         return bool(self.tokens)
@@ -45,8 +51,19 @@ class TokenStream(Sized, Iterable[Token]):
 
     def pop(self, rule_name: Optional[str] = None) -> tuple['TokenStream', Token]:
         if not self:
-            raise errors.Error(msg='pop empty token stream')
+            raise TokenStreamError(state=self, msg='unexpected end of stream')
         if rule_name is not None and self.head().rule_name != rule_name:
-            raise errors.Error(
-                msg=f'popping token stream got head {self.head().rule_name} expected {rule_name}')
+            raise TokenStreamError(state=self,
+                                   msg=f'got {self.head()} expected {rule_name}')
         return TokenStream(self.tokens[1:]), self.head()
+
+
+@dataclass(frozen=True, kw_only=True, repr=False)
+class TokenStreamError(errors.Error):
+    state: TokenStream
+
+    def _repr_line(self) -> str:
+        return f'TokenStreamError(state={self.state},msg={repr(self.msg)})'
+
+    def __repr__(self) -> str:
+        return self._repr(0)

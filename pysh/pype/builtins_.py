@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 import operator
 from typing import Any, Callable, Generic, Mapping, Type, TypeVar
-from ..core import errors, lexer, loader, parser, regex, tokens
+from ..core import errors, lexer,  parser, regex, tokens
 from . import classes, funcs, vals
 
 
@@ -53,7 +53,7 @@ class Object(classes.Object, ABC):
                 'object': Object.load,
                 'int': _IntObject.load,
                 'none': _NoneObject.load,
-            })
+            }),
         )
 
     @classmethod
@@ -123,7 +123,7 @@ class _IntObject(_ValueObject[int]):
 
     @classmethod
     def lexer_(cls) -> lexer.Lexer:
-        return lexer.Lexer([lexer.Rule('int', loader.load_regex('(\\-)?[0-9]+'))])
+        return lexer.Lexer([lexer.Rule('int', regex.load('(\\-)?[0-9]+'))])
 
 
 _IntClass = _Class(

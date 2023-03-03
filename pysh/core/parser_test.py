@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from typing import Optional
 from unittest import TestCase
-from . import errors, parser, tokens
+from . import errors, lexer, parser, tokens
 
 
 @dataclass(frozen=True)
