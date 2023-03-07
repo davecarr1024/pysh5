@@ -42,7 +42,8 @@ class TokenStream(Sized, Iterable[Token]):
 
     def head(self) -> Token:
         if not self:
-            raise errors.Error(msg='head from empty tokenstream')
+            raise TokenStreamError(
+                state=self, msg='unexpected end of stream')
         return self.tokens[0]
 
     def tail(self) -> 'TokenStream':

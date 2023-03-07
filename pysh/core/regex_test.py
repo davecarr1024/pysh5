@@ -2,6 +2,10 @@ from typing import Optional
 from unittest import TestCase
 from . import chars, errors, regex, tokens
 
+if 'unittest.util' in __import__('sys').modules:
+    # Show full diff in self.assertEqual.
+    __import__('sys').modules['unittest.util']._MAX_LENGTH = 999999999
+
 
 class ResultTest(TestCase):
     def test_add(self):
@@ -467,6 +471,7 @@ class RegexTest(TestCase):
                 (
                     chars.CharStream(),
                     regex.Result([
+                        chars.Char('b'),
                     ])
                 )
             ),
@@ -478,6 +483,7 @@ class RegexTest(TestCase):
                         chars.Char('c', chars.Position(0, 1)),
                     ]),
                     regex.Result([
+                        chars.Char('b'),
                     ])
                 )
             ),
@@ -546,3 +552,99 @@ class RegexTest(TestCase):
         ]):
             with self.subTest(val=val, expected=expected):
                 self.assertEqual(regex.literal(val), expected)
+
+    def test_load(self):
+        for input, expected in list[tuple[str, Optional[regex.Regex]]]([
+            (
+                '',
+                None,
+            ),
+            (
+                'a',
+                regex.literal('a'),
+            ),
+            (
+                'ab',
+                regex.literal('ab'),
+            ),
+            (
+                '(ab)',
+                regex.literal('ab'),
+            ),
+            (
+                '(a)(b)',
+                regex.literal('ab'),
+            ),
+            (
+                '(a|b)',
+                regex.Or([
+                    regex.literal('a'),
+                    regex.literal('b'),
+                ]),
+            ),
+            (
+                '(a|b|c)',
+                regex.Or([
+                    regex.literal('a'),
+                    regex.literal('b'),
+                    regex.literal('c'),
+                ]),
+            ),
+            (
+                '(a|(bc))',
+                regex.Or([
+                    regex.literal('a'),
+                    regex.literal('bc'),
+                ]),
+            ),
+            (
+                '[a-z]',
+                regex.Range('a', 'z'),
+            ),
+            (
+                '.',
+                regex.Any(),
+            ),
+            (
+                '\\w',
+                regex.Whitespace(),
+            ),
+            (
+                '\\(',
+                regex.literal('('),
+            ),
+            (
+                '\\',
+                None,
+            ),
+            (
+                'a*',
+                regex.ZeroOrMore(regex.literal('a')),
+            ),
+            (
+                'a+',
+                regex.OneOrMore(regex.literal('a')),
+            ),
+            (
+                'a?',
+                regex.ZeroOrOne(regex.literal('a')),
+            ),
+            (
+                'a!',
+                regex.UntilEmpty(regex.literal('a')),
+            ),
+            (
+                '^a',
+                regex.Not(regex.literal('a')),
+            ),
+            (
+                '~a',
+                regex.Skip(regex.literal('a')),
+            ),
+        ]):
+            with self.subTest(input=input, expected=expected):
+                if expected is None:
+                    with self.assertRaises(errors.Error):
+                        regex.load(input)
+                else:
+                    self.assertEqual(regex.load(input), expected)

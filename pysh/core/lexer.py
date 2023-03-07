@@ -46,10 +46,16 @@ class Rule:
             raise RuleError(rule=self, state=state, child=error)
 
     @staticmethod
-    def load(rule_name: str, regex_: str | regex.Regex) -> 'Rule':
+    def load(rule_name: str, regex_: str | regex.Regex | None = None) -> 'Rule':
+        if regex_ is None:
+            regex_ = regex.literal(rule_name)
         if isinstance(regex_, str):
             regex_ = regex.load(regex_)
         return Rule(rule_name, regex_)
+
+    @staticmethod
+    def whitespace() -> 'Rule':
+        return Rule.load('ws', '~(\\w+)')
 
 
 @dataclass(frozen=True)
@@ -71,7 +77,9 @@ class Lexer(Sized, Iterable[Rule]):
             rules[rule.name] = rule.regex_
         return rules
 
-    def __or__(self, rhs: 'Lexer') -> 'Lexer':
+    def __or__(self, rhs: 'Lexer | Rule') -> 'Lexer':
+        if isinstance(rhs, Rule):
+            rhs = Lexer([rhs])
         lhs_rules = self._rules_dict()
         rhs_rules = rhs._rules_dict()
         for rule_name in set(lhs_rules.keys()) & set(rhs_rules.keys()):
@@ -81,10 +89,6 @@ class Lexer(Sized, Iterable[Rule]):
                 raise errors.Error(
                     msg=f'redefining lex rule {rule_name}: {lhs_rule} != {rhs_rule}')
         return Lexer.load(**(lhs_rules | rhs_rules))
-
-    @staticmethod
-    def load(**regexes: str | regex.Regex) -> 'Lexer':
-        return Lexer([Rule.load(rule_name, regex) for rule_name, regex in regexes.items()])
 
     def _apply_any(self, state: chars.CharStream) -> StateAndResult:
         errors_: MutableSequence[errors.Error] = []
@@ -106,5 +110,9 @@ class Lexer(Sized, Iterable[Rule]):
         return tokens.TokenStream(tokens_)
 
     @staticmethod
-    def literals(vals: Sequence[str]) -> 'Lexer':
-        return Lexer([Rule(val, regex.literal(val)) for val in vals])
+    def load(**regexes: str | regex.Regex) -> 'Lexer':
+        return Lexer([Rule.load(rule_name, regex) for rule_name, regex in regexes.items()])
+
+    @staticmethod
+    def literal(*vals: str) -> 'Lexer':
+        return Lexer([Rule.load(val) for val in vals])

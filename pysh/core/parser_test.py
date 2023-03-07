@@ -1,551 +1,135 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
-from typing import Optional
+from dataclasses import dataclass, field
+from typing import Optional, Sequence
 from unittest import TestCase
 from . import errors, lexer, parser, tokens
+
+if 'unittest.util' in __import__('sys').modules:
+    # Show full diff in self.assertEqual.
+    __import__('sys').modules['unittest.util']._MAX_LENGTH = 999999999
 
 
 @dataclass(frozen=True)
 class Val(ABC):
     @classmethod
     @abstractmethod
-    def load(cls, state: tokens.TokenStream, scope: parser.Scope['Val']) -> parser.StateAndResult['Val']:
-        return parser.Or[Val]([Int.load, Str.load])(state, scope)
+    def loader(cls) -> parser.Rule['Val']:
+        return parser.Parser[Val](
+            'val',
+            parser.Scope[Val]({
+                'val': parser.Or[Val]([
+                    parser.Ref[Val]('int'),
+                    parser.Ref[Val]('str'),
+                    parser.Ref[Val]('list'),
+                ]),
+                'int': Int.loader(),
+                'str': Str.loader(),
+                'list': List.loader(),
+            })
+        )
 
 
 @dataclass(frozen=True)
 class Int(Val):
     val: int
 
-    @classmethod
-    def load(cls, state: tokens.TokenStream, scope: parser.Scope[Val]) -> parser.StateAndResult[Val]:
+    @staticmethod
+    def _convert_token(token: tokens.Token) -> Val:
         try:
-            return parser.Literal[Val]('int', lambda token: Int(int(token.val)))(state, scope)
+            return Int(int(token.val))
         except ValueError as error:
-            raise parser.StateError(
-                state=state, msg=f'failed to load int: {error}')
+            raise errors.Error(msg=f'failed to load int: {error}')
+
+    @classmethod
+    def loader(cls) -> parser.Rule[Val]:
+        return parser.Literal[Val](lexer.Rule.load('int', '(\\-)?(\\d)+'), Int._convert_token)
 
 
 @dataclass(frozen=True)
 class Str(Val):
     val: str
 
+    @staticmethod
+    def _convert_token(token: tokens.Token) -> Val:
+        return Str(token.val[1:-1])
+
     @classmethod
-    def load(cls, state: tokens.TokenStream, scope: parser.Scope[Val]) -> parser.StateAndResult[Val]:
-        return parser.Literal[Val]('str', lambda token: Str(token.val))(state, scope)
+    def loader(cls) -> parser.Rule[Val]:
+        return parser.Literal[Val](lexer.Rule.load('str', '"(^")*"'), Str._convert_token)
+
+
+@dataclass(frozen=True)
+class List(Val):
+    vals: Sequence[Val] = field(default_factory=list[Val])
+
+    @classmethod
+    def loader(cls) -> parser.Rule[Val]:
+        return parser.Combiner[Val].load(
+            '[',
+            parser.Combiner[Val].load(
+                parser.Combiner[Val].Func(
+                    parser.MultipleResultCombiner[Val].load(
+                        parser.Ref[Val]('val'),
+                        parser.ZeroOrMore(
+                            parser.Combiner[Val].load(
+                                ',',
+                                parser.Ref[Val]('val'),
+                            ),
+                        ),
+                    ),
+                    List,
+                ),
+            ),
+            ']',
+            _lexer=lexer.Lexer([lexer.Rule.whitespace()]),
+        )
 
 
 class ScopeTest(TestCase):
     def test_or(self):
         self.assertEqual(
             parser.Scope[Val]({
-                'a': Int.load,
+                'a': Int.loader(),
             }) | parser.Scope[Val]({
-                'b': Str.load,
+                'b': Str.loader(),
             }),
             parser.Scope[Val]({
-                'a': Int.load,
-                'b': Str.load,
+                'a': Int.loader(),
+                'b': Str.loader(),
             })
         )
 
 
-class RuleTest(TestCase):
-    def test_call(self):
-        for rule, state, scope, expected in list[tuple[parser.Rule[Val], tokens.TokenStream, parser.Scope[Val], Optional[parser.StateAndResult[Val]]]]([
+class ValTest(TestCase):
+    def test_load(self):
+        for state, expected in list[tuple[str | tokens.TokenStream, Optional[parser.StateAndResult[Val] | Val]]]([
             (
-                Int.load,
-                tokens.TokenStream([
-                    tokens.Token('int', '1'),
-                ]),
-                parser.Scope[Val](),
-                (
-                    tokens.TokenStream(),
-                    Int(1),
-                )
+                '1',
+                Int(1),
             ),
             (
-                Int.load,
-                tokens.TokenStream([
-                    tokens.Token('int', '1'),
-                    tokens.Token('r', 'a'),
-                ]),
-                parser.Scope[Val](),
-                (
-                    tokens.TokenStream([
-                        tokens.Token('r', 'a'),
-                    ]),
-                    Int(1),
-                )
+                '"a"',
+                Str('a'),
             ),
             (
-                Val.load,
-                tokens.TokenStream([
-                    tokens.Token('int', '1'),
-                ]),
-                parser.Scope[Val](),
-                (
-                    tokens.TokenStream(),
-                    Int(1),
-                )
+                '[1]',
+                List([Int(1)])
             ),
             (
-                Val.load,
-                tokens.TokenStream([
-                    tokens.Token('str', 'a'),
-                ]),
-                parser.Scope[Val](),
-                (
-                    tokens.TokenStream(),
-                    Str('a'),
-                )
-            ),
-            (
-                Val.load,
-                tokens.TokenStream([
-                    tokens.Token('str', 'a'),
-                    tokens.Token('r', 'a'),
-                ]),
-                parser.Scope[Val](),
-                (
-                    tokens.TokenStream([
-                        tokens.Token('r', 'a'),
-                    ]),
-                    Str('a'),
-                )
-            ),
-            (
-                parser.Ref('r'),
-                tokens.TokenStream([
-                    tokens.Token('int', '1'),
-                ]),
-                parser.Scope[Val]({
-                    'r': Val.load,
-                }),
-                (
-                    tokens.TokenStream([]),
-                    Int(1),
-                ),
-            ),
-            (
-                parser.Ref[Val]('s'),
-                tokens.TokenStream([
-                    tokens.Token('int', '1'),
-                ]),
-                parser.Scope[Val]({
-                    'r': Val.load,
-                }),
-                None,
-            ),
-            (
-                parser.Parser(
-                    'r',
-                    parser.Scope[Val]({
-                        'r': parser.Ref('s'),
-                        's': Val.load,
-                    }),
-                ),
-                tokens.TokenStream([
-                    tokens.Token('int', '1'),
-                ]),
-                parser.Scope[Val](),
-                (
-                    tokens.TokenStream([]),
-                    Int(1),
-                ),
+                '[1, "a"]',
+                List([Int(1), Str('a')])
             ),
         ]):
-            with self.subTest(rule=rule, state=state, scope=scope, expected=expected):
+            with self.subTest(state=state, expected=expected):
+                if isinstance(state, str):
+                    state = Val.loader().lexer(state)
                 if expected is None:
                     with self.assertRaises(errors.Error):
-                        rule(state, scope)
+                        Val.loader()(state, parser.Scope[Val]())
                 else:
-                    self.assertEqual(rule(state, scope), expected)
-
-    def test_call_multiple_result(self):
-        for rule, state, scope, expected in list[tuple[parser.MultipleResultRule[Val], tokens.TokenStream, parser.Scope[Val], Optional[parser.StateAndMultipleResult[Val]]]]([
-            (
-                parser.And([Val.load, Val.load]),
-                tokens.TokenStream([
-                    tokens.Token('int', '1'),
-                    tokens.Token('str', 'a'),
-                ]),
-                parser.Scope[Val](),
-                (
-                    tokens.TokenStream(),
-                    [Int(1), Str('a')],
-                )
-            ),
-            (
-                parser.And([Val.load, Val.load]),
-                tokens.TokenStream([
-                    tokens.Token('int', '1'),
-                    tokens.Token('str', 'a'),
-                    tokens.Token('s', 'b'),
-                ]),
-                parser.Scope[Val](),
-                (
-                    tokens.TokenStream([
-                        tokens.Token('s', 'b'),
-                    ]),
-                    [Int(1), Str('a')],
-                )
-            ),
-            (
-                parser.ZeroOrMore(Val.load),
-                tokens.TokenStream([]),
-                parser.Scope[Val](),
-                (
-                    tokens.TokenStream([]),
-                    [],
-                ),
-            ),
-            (
-                parser.ZeroOrMore(Val.load),
-                tokens.TokenStream([
-                    tokens.Token('int', '1'),
-                ]),
-                parser.Scope[Val](),
-                (
-                    tokens.TokenStream([]),
-                    [
-                        Int(1),
-                    ],
-                ),
-            ),
-            (
-                parser.ZeroOrMore(Val.load),
-                tokens.TokenStream([
-                    tokens.Token('int', '1'),
-                    tokens.Token('str', 'a'),
-                ]),
-                parser.Scope[Val](),
-                (
-                    tokens.TokenStream([]),
-                    [
-                        Int(1),
-                        Str('a'),
-                    ],
-                ),
-            ),
-            (
-                parser.ZeroOrMore(Val.load),
-                tokens.TokenStream([
-                    tokens.Token('s', 'b'),
-                ]),
-                parser.Scope[Val](),
-                (
-                    tokens.TokenStream([
-                        tokens.Token('s', 'b'),
-                    ]),
-                    [],
-                ),
-            ),
-            (
-                parser.ZeroOrMore(Val.load),
-                tokens.TokenStream([
-                    tokens.Token('int', '1'),
-                    tokens.Token('s', 'b'),
-                ]),
-                parser.Scope[Val](),
-                (
-                    tokens.TokenStream([
-                        tokens.Token('s', 'b'),
-                    ]),
-                    [
-                        Int(1),
-                    ],
-                ),
-            ),
-            (
-                parser.ZeroOrMore(Val.load),
-                tokens.TokenStream([
-                    tokens.Token('int', '1'),
-                    tokens.Token('str', 'a'),
-                    tokens.Token('s', 'b'),
-                ]),
-                parser.Scope[Val](),
-                (
-                    tokens.TokenStream([
-                        tokens.Token('s', 'b'),
-                    ]),
-                    [
-                        Int(1),
-                        Str('a'),
-                    ],
-                ),
-            ),
-            (
-                parser.OneOrMore(Val.load),
-                tokens.TokenStream([]),
-                parser.Scope[Val](),
-                None,
-            ),
-            (
-                parser.OneOrMore(Val.load),
-                tokens.TokenStream([
-                    tokens.Token('int', '1'),
-                ]),
-                parser.Scope[Val](),
-                (
-                    tokens.TokenStream([]),
-                    [
-                        Int(1),
-                    ],
-                ),
-            ),
-            (
-                parser.OneOrMore(Val.load),
-                tokens.TokenStream([
-                    tokens.Token('int', '1'),
-                    tokens.Token('str', 'a'),
-                ]),
-                parser.Scope[Val](),
-                (
-                    tokens.TokenStream([]),
-                    [
-                        Int(1),
-                        Str('a'),
-                    ],
-                ),
-            ),
-            (
-                parser.OneOrMore(Val.load),
-                tokens.TokenStream([
-                    tokens.Token('s', 'b'),
-                ]),
-                parser.Scope[Val](),
-                None,
-            ),
-            (
-                parser.OneOrMore(Val.load),
-                tokens.TokenStream([
-                    tokens.Token('int', '1'),
-                    tokens.Token('s', 'b'),
-                ]),
-                parser.Scope[Val](),
-                (
-                    tokens.TokenStream([
-                        tokens.Token('s', 'b'),
-                    ]),
-                    [
-                        Int(1),
-                    ],
-                ),
-            ),
-            (
-                parser.OneOrMore(Val.load),
-                tokens.TokenStream([
-                    tokens.Token('int', '1'),
-                    tokens.Token('str', 'a'),
-                    tokens.Token('s', 'b'),
-                ]),
-                parser.Scope[Val](),
-                (
-                    tokens.TokenStream([
-                        tokens.Token('s', 'b'),
-                    ]),
-                    [
-                        Int(1),
-                        Str('a'),
-                    ],
-                ),
-            ),
-            (
-                parser.UntilEmpty(Val.load),
-                tokens.TokenStream([]),
-                parser.Scope[Val](),
-                (
-                    tokens.TokenStream([]),
-                    [],
-                ),
-            ),
-            (
-                parser.UntilEmpty(Val.load),
-                tokens.TokenStream([
-                    tokens.Token('int', '1'),
-                ]),
-                parser.Scope[Val](),
-                (
-                    tokens.TokenStream([]),
-                    [
-                        Int(1),
-                    ],
-                ),
-            ),
-            (
-                parser.UntilEmpty(Val.load),
-                tokens.TokenStream([
-                    tokens.Token('int', '1'),
-                    tokens.Token('str', 'a'),
-                ]),
-                parser.Scope[Val](),
-                (
-                    tokens.TokenStream([]),
-                    [
-                        Int(1),
-                        Str('a'),
-                    ],
-                ),
-            ),
-            (
-                parser.UntilEmpty(Val.load),
-                tokens.TokenStream([
-                    tokens.Token('s', 'b'),
-                ]),
-                parser.Scope[Val](),
-                None,
-            ),
-            (
-                parser.UntilEmpty(Val.load),
-                tokens.TokenStream([
-                    tokens.Token('int', '1'),
-                    tokens.Token('s', 'b'),
-                ]),
-                parser.Scope[Val](),
-                None,
-            ),
-            (
-                parser.UntilEmpty(Val.load),
-                tokens.TokenStream([
-                    tokens.Token('int', '1'),
-                    tokens.Token('str', 'a'),
-                    tokens.Token('s', 'b'),
-                ]),
-                parser.Scope[Val](),
-                None,
-            ),
-        ]):
-            with self.subTest(rule=rule, state=state, scope=scope, expected=expected):
-                if expected is None:
-                    with self.assertRaises(errors.Error):
-                        rule(state, scope)
-                else:
-                    self.assertEqual(rule(state, scope), expected)
-
-    def test_call_optional(self):
-        for rule, state, scope, expected in list[tuple[parser.OptionalResultRule[Val], tokens.TokenStream, parser.Scope[Val], Optional[parser.StateAndOptionalResult[Val]]]]([
-            (
-                parser.ZeroOrOne(Val.load),
-                tokens.TokenStream([]),
-                parser.Scope[Val](),
-                (
-                    tokens.TokenStream([]),
-                    None,
-                ),
-            ),
-            (
-                parser.ZeroOrOne(Val.load),
-                tokens.TokenStream([
-                    tokens.Token('int', '1'),
-                ]),
-                parser.Scope[Val](),
-                (
-                    tokens.TokenStream([]),
-                    Int(1),
-                ),
-            ),
-            (
-                parser.ZeroOrOne(Val.load),
-                tokens.TokenStream([
-                    tokens.Token('s', 'b'),
-                ]),
-                parser.Scope[Val](),
-                (
-                    tokens.TokenStream([
-                        tokens.Token('s', 'b'),
-                    ]),
-                    None,
-                ),
-            ),
-            (
-                parser.ZeroOrOne(Val.load),
-                tokens.TokenStream([
-                    tokens.Token('int', '1'),
-                    tokens.Token('s', 'b'),
-                ]),
-                parser.Scope[Val](),
-                (
-                    tokens.TokenStream([
-                        tokens.Token('s', 'b'),
-                    ]),
-                    Int(1),
-                ),
-            ),
-        ]):
-            with self.subTest(rule=rule, state=state, scope=scope, expected=expected):
-                if expected is None:
-                    with self.assertRaises(errors.Error):
-                        rule(state, scope)
-                else:
-                    self.assertEqual(rule(state, scope), expected)
-
-    def test_token_val(self):
-        for state, rule_name, expected in list[tuple[tokens.TokenStream, Optional[str], Optional[parser.StateAndResult[str]]]]([
-            (
-                tokens.TokenStream([
-                    tokens.Token('r', 'a'),
-                ]),
-                None,
-                (
-                    tokens.TokenStream([]),
-                    'a',
-                ),
-            ),
-            (
-                tokens.TokenStream([
-                    tokens.Token('r', 'a'),
-                    tokens.Token('s', 'b'),
-                ]),
-                None,
-                (
-                    tokens.TokenStream([
-                        tokens.Token('s', 'b'),
-                    ]),
-                    'a',
-                ),
-            ),
-            (
-                tokens.TokenStream([
-                    tokens.Token('r', 'a'),
-                ]),
-                'r',
-                (
-                    tokens.TokenStream([]),
-                    'a',
-                ),
-            ),
-            (
-                tokens.TokenStream([
-                    tokens.Token('r', 'a'),
-                    tokens.Token('s', 'b'),
-                ]),
-                'r',
-                (
-                    tokens.TokenStream([
-                        tokens.Token('s', 'b'),
-                    ]),
-                    'a',
-                ),
-            ),
-            (
-                tokens.TokenStream([
-                    tokens.Token('r', 'a'),
-                ]),
-                's',
-                None,
-            ),
-            (
-                tokens.TokenStream([
-                ]),
-                None,
-                None,
-            ),
-        ]):
-            with self.subTest(state=state, rule_name=rule_name, expected=expected):
-                if expected is None:
-                    with self.assertRaises(errors.Error):
-                        parser.token_val(state, rule_name=rule_name)
-                else:
+                    if isinstance(expected, Val):
+                        expected = (tokens.TokenStream(), expected)
                     self.assertEqual(
-                        parser.token_val(state, rule_name=rule_name), expected)
+                        Val.loader()(state, parser.Scope[Val]()),
+                        expected
+                    )

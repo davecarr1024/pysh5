@@ -140,12 +140,12 @@ class Or(_NaryRegex):
 
 
 @dataclass(frozen=True)
-class UnaryRegex(_AbstractRegex):
+class _UnaryRegex(_AbstractRegex):
     child: Regex
 
 
 @dataclass(frozen=True)
-class ZeroOrMore(UnaryRegex):
+class ZeroOrMore(_UnaryRegex):
     def __str__(self) -> str:
         return f'{self.child}*'
 
@@ -160,7 +160,7 @@ class ZeroOrMore(UnaryRegex):
 
 
 @dataclass(frozen=True)
-class OneOrMore(UnaryRegex):
+class OneOrMore(_UnaryRegex):
     def __str__(self) -> str:
         return f'{self.child}+'
 
@@ -178,7 +178,7 @@ class OneOrMore(UnaryRegex):
 
 
 @dataclass(frozen=True)
-class ZeroOrOne(UnaryRegex):
+class ZeroOrOne(_UnaryRegex):
     def __str__(self) -> str:
         return f'{self.child}?'
 
@@ -190,7 +190,7 @@ class ZeroOrOne(UnaryRegex):
 
 
 @dataclass(frozen=True)
-class UntilEmpty(UnaryRegex):
+class UntilEmpty(_UnaryRegex):
     def __str__(self) -> str:
         return f'{self.child}?'
 
@@ -206,7 +206,7 @@ class UntilEmpty(UnaryRegex):
 
 
 @dataclass(frozen=True)
-class Not(UnaryRegex):
+class Not(_UnaryRegex):
     def __str__(self) -> str:
         return f'^{self.child}'
 
@@ -214,12 +214,12 @@ class Not(UnaryRegex):
         try:
             self.child(state)
         except errors.Error:
-            return state.tail(), Result()
+            return state.tail(), Result([state.head()])
         raise RegexError(regex=self, state=state)
 
 
 @dataclass(frozen=True)
-class Skip(UnaryRegex):
+class Skip(_UnaryRegex):
     def __str__(self) -> str:
         return f'~{self.child}'
 
@@ -241,88 +241,141 @@ class Whitespace(_AbstractRegex):
 
 
 def load(input: str) -> Regex:
-    from . import lexer, parser
+    from . import lexer as lexer_lib, parser
 
-    operators = '()|[-]^*+?!\\~'
-    lexer_ = lexer.Lexer([
-        lexer.Rule(operator, literal(operator))
-        for operator in operators
-    ]+[
-        lexer.Rule('literal', Any())
-    ])
-    tokens_ = lexer_(input)
-
-    def load_and(state: tokens.TokenStream, scope: parser.Scope[Regex]) -> parser.StateAndResult[Regex]:
-        state, _ = state.pop('(')
-        state, rules = parser.OneOrMore[Regex](load_regex)(state, scope)
-        state, _ = state.pop(')')
-        if len(rules) == 1:
-            return state, rules[0]
-        return state, And(rules)
-
-    def load_or(state: tokens.TokenStream, scope: parser.Scope[Regex]) -> parser.StateAndResult[Regex]:
-        def load_tail(state: tokens.TokenStream, scope: parser.Scope[Regex]) -> parser.StateAndResult[Regex]:
-            state, _ = state.pop('|')
-            return load_regex(state, scope)
-
-        state, _ = state.pop('(')
-        state, head = load_regex(state, scope)
-        state, tails = parser.OneOrMore[Regex](load_tail)(state, scope)
-        state, _ = state.pop(')')
-        return state, Or([head] + list(tails))
-
-    load_literal = parser.Literal[Regex](
-        'literal', lambda token: literal(token.val))
-
-    def load_postfix(operator: str, type: Type[UnaryRegex]) -> parser.Rule[Regex]:
-        def inner(state: tokens.TokenStream, scope: parser.Scope[Regex]) -> parser.StateAndResult[Regex]:
-            state, regex = load_operand(state, scope)
-            state, _ = state.pop(operator)
-            return state, type(regex)
-        return inner
-
-    load_zero_or_more = load_postfix('*', ZeroOrMore)
-    load_one_or_more = load_postfix('+', OneOrMore)
-    load_zero_or_one = load_postfix('?', ZeroOrOne)
-    load_until_empty = load_postfix('!', UntilEmpty)
-
-    def load_prefix(operator: str, type: Type[UnaryRegex]) -> parser.Rule[Regex]:
-        def inner(state: tokens.TokenStream, scope: parser.Scope[Regex]) -> parser.StateAndResult[Regex]:
-            state, _ = state.pop(operator)
-            state, regex = load_operand(state, scope)
-            return state, type(regex)
-        return inner
-
-    load_not = load_prefix('^', Not)
-    load_skip = load_prefix('~', Skip)
-
-    def load_range(state: tokens.TokenStream, scope: parser.Scope[Regex]) -> parser.StateAndResult[Regex]:
-        state, _ = state.pop('[')
-        state, start = parser.token_val(state, rule_name='literal')
-        state, _ = state.pop('-')
-        state, end = parser.token_val(state, rule_name='literal')
-        state, _ = state.pop(']')
-        return state, Range(start, end)
-
-    def load_special(state: tokens.TokenStream, scope: parser.Scope[Regex]) -> parser.StateAndResult[Regex]:
-        state, _ = state.pop('\\')
-        state, val = parser.token_val(state)
-        if val == 'w':
-            return state, Whitespace()
+    def and_args(args: Sequence[Regex]) -> Regex:
+        if len(args) == 0:
+            raise errors.Error(msg='loading empty sub-regex')
+        if len(args) == 1:
+            return args[0]
         else:
-            return state, literal(val)
+            return And(args)
 
-    load_operation = parser.Or[Regex](
-        [load_zero_or_more, load_one_or_more, load_zero_or_one, load_until_empty, load_not, load_skip])
+    literal_lex_rule = lexer_lib.Rule.load(
+        'literal',
+        Not(
+            Or([
+                literal(operator)
+                for operator in '()[-]|*+?!^~.\\'
+            ])
+        )
+    )
 
-    load_operand = parser.Or[Regex](
-        [load_range, load_or, load_and, load_special, load_literal])
+    class RangeLoader(parser.Rule[Regex]):
+        def __call__(self, state: tokens.TokenStream, scope: parser.Scope[Regex]) -> parser.StateAndResult[Regex]:
+            state, _ = state.pop('[')
+            state, start_token = state.pop('literal')
+            state, _ = state.pop('-')
+            state, end_token = state.pop('literal')
+            state, _ = state.pop(']')
+            return state, Range(start_token.val, end_token.val)
 
-    load_regex = parser.Or[Regex]([load_operation, load_operand])
+        @property
+        def lexer(self) -> lexer_lib.Lexer:
+            return lexer_lib.Lexer.literal('[', '-', ']') | literal_lex_rule
 
-    _, rules = parser.UntilEmpty[Regex](
-        load_regex)(tokens_, parser.Scope[Regex]())
-    if len(rules) == 1:
-        return rules[0]
-    else:
-        return And(rules)
+    class SpecialLoader(parser.Rule[Regex]):
+        def __call__(self, state: tokens.TokenStream, scope: parser.Scope[Regex]) -> parser.StateAndResult[Regex]:
+            state, _ = state.pop('\\')
+            state, token = state.pop()
+            if token.val == 'w':
+                return state, Whitespace()
+            elif token.val == 'd':
+                return state, Range('0', '9')
+            return state, literal(token.val)
+
+        @property
+        def lexer(self) -> lexer_lib.Lexer:
+            return lexer_lib.Lexer.literal('\\')
+
+    def suffix_loader(operator: str, type: Type[_UnaryRegex]) -> parser.Rule[Regex]:
+        return parser.Combiner[Regex].load(
+            parser.Combiner[Regex].Func(
+                parser.MultipleResultCombiner[Regex].load(
+                    parser.Ref[Regex]('operand'),
+                ),
+                lambda results: type(results[0]),
+            ),
+            operator,
+        )
+
+    def prefix_loader(operator: str, type: Type[_UnaryRegex]) -> parser.Rule[Regex]:
+        return parser.Combiner[Regex].load(
+            operator,
+            parser.Combiner[Regex].Func(
+                parser.MultipleResultCombiner[Regex].load(
+                    parser.Ref[Regex]('operand'),
+                ),
+                lambda results: type(results[0]),
+            ),
+        )
+
+    _, result = parser.Parser[Regex](
+        'root',
+        parser.Scope[Regex]({
+            'root': parser.Combiner[Regex].load(
+                parser.Combiner[Regex].Func(
+                    parser.UntilEmpty[Regex](
+                        parser.Ref[Regex]('regex'),
+                    ),
+                    and_args
+                ),
+            ),
+            'regex': parser.Or[Regex]([
+                parser.Ref[Regex]('operation'),
+                parser.Ref[Regex]('operand'),
+            ]),
+            'operation': parser.Or[Regex]([
+                suffix_loader('*', ZeroOrMore),
+                suffix_loader('+', OneOrMore),
+                suffix_loader('?', ZeroOrOne),
+                suffix_loader('!', UntilEmpty),
+                prefix_loader('^', Not),
+                prefix_loader('~', Skip),
+            ]),
+            'operand': parser.Or[Regex]([
+                parser.Ref[Regex]('any'),
+                parser.Ref[Regex]('special'),
+                parser.Ref[Regex]('or'),
+                parser.Ref[Regex]('and'),
+                parser.Ref[Regex]('range'),
+                parser.Ref[Regex]('literal'),
+            ]),
+            'special': SpecialLoader(),
+            'any': parser.Literal(lexer_lib.Rule.load('.'), lambda _: Any()),
+            'range': RangeLoader(),
+            'and': parser.Combiner[Regex].load(
+                '(',
+                parser.Combiner[Regex].Func(
+                    parser.OneOrMore[Regex](
+                        parser.Ref[Regex]('regex'),
+                    ),
+                    and_args
+                ),
+                ')',
+            ),
+            'or': parser.Combiner[Regex].load(
+                '(',
+                parser.Combiner[Regex].load(
+                    parser.Combiner[Regex].Func(
+                        parser.MultipleResultCombiner.load(
+                            parser.Ref[Regex]('regex'),
+                            parser.OneOrMore[Regex](
+                                parser.Combiner.load(
+                                    '|',
+                                    parser.Ref[Regex]('regex'),
+                                ),
+                            )
+                        ),
+                        Or
+                    )
+                ),
+                ')',
+            ),
+            'literal': parser.Literal(
+                literal_lex_rule,
+                lambda token: literal(token.val)
+            ),
+        })
+    )(input)
+    return result
