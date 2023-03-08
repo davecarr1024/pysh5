@@ -289,13 +289,8 @@ def load(input: str) -> Regex:
             return lexer_lib.Lexer.literal('\\')
 
     def suffix_loader(operator: str, type: Type[_UnaryRegex]) -> parser.Rule[Regex]:
-        return parser.Combiner[Regex].load(
-            parser.Combiner[Regex].Func(
-                parser.MultipleResultCombiner[Regex].load(
-                    parser.Ref[Regex]('operand'),
-                ),
-                lambda results: type(results[0]),
-            ),
+        return parser.combine(
+            parser.Ref[Regex]('operand'),
             operator,
         )
 
