@@ -292,30 +292,20 @@ def load(input: str) -> Regex:
         return parser.combine(
             parser.Ref[Regex]('operand'),
             operator,
-        )
+        ).single().convert(type)
 
     def prefix_loader(operator: str, type: Type[_UnaryRegex]) -> parser.SingleResultRule[Regex]:
-        return parser.Combiner[Regex].load(
+        return parser.combine(
             operator,
-            parser.Combiner[Regex].Func(
-                parser.MultipleResultCombiner[Regex].load(
-                    parser.Ref[Regex]('operand'),
-                ),
-                lambda results: type(results[0]),
-            ),
-        )
+            parser.Ref[Regex]('operand'),
+        ).single().convert(type)
 
     _, result = parser.Parser[Regex](
         'root',
         parser.Scope[Regex]({
-            'root': parser.Combiner[Regex].load(
-                parser.Combiner[Regex].Func(
-                    parser.UntilEmpty[Regex](
-                        parser.Ref[Regex]('regex'),
-                    ),
-                    and_args
-                ),
-            ),
+            'root': parser.UntilEmpty[Regex](
+                parser.Ref[Regex]('regex')
+            ).convert(and_args),
             'regex': parser.Or[Regex]([
                 parser.Ref[Regex]('operation'),
                 parser.Ref[Regex]('operand'),
@@ -339,34 +329,25 @@ def load(input: str) -> Regex:
             'special': SpecialLoader(),
             'any': parser.Literal(lexer_lib.Rule.load('.'), lambda _: Any()),
             'range': RangeLoader(),
-            'and': parser.Combiner[Regex].load(
+            'and':
+            parser.combine(
                 '(',
-                parser.Combiner[Regex].Func(
-                    parser.OneOrMore[Regex](
+                parser.OneOrMore[Regex](
+                    parser.Ref[Regex]('regex')
+                ),
+                ')',
+            ).convert(and_args),
+            'or': parser.combine(
+                '(',
+                parser.Ref[Regex]('regex'),
+                parser.OneOrMore(
+                    parser.combine(
+                        '|',
                         parser.Ref[Regex]('regex'),
-                    ),
-                    and_args
+                    ).single()
                 ),
                 ')',
-            ),
-            'or': parser.Combiner[Regex].load(
-                '(',
-                parser.Combiner[Regex].load(
-                    parser.Combiner[Regex].Func(
-                        parser.MultipleResultCombiner.load(
-                            parser.Ref[Regex]('regex'),
-                            parser.OneOrMore[Regex](
-                                parser.Combiner.load(
-                                    '|',
-                                    parser.Ref[Regex]('regex'),
-                                ),
-                            )
-                        ),
-                        Or
-                    )
-                ),
-                ')',
-            ),
+            ).convert(Or),
             'literal': parser.Literal(
                 literal_lex_rule,
                 lambda token: literal(token.val)

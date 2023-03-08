@@ -78,6 +78,7 @@ class List(Val):
                 ).convert(List)
             ).single(List()),
             ']',
+            _lexer=lexer.Lexer([lexer.Rule.whitespace()]),
         ).single()
 
 
