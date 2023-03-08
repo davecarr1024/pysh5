@@ -261,7 +261,7 @@ def load(input: str) -> Regex:
         )
     )
 
-    class RangeLoader(parser.Rule[Regex]):
+    class RangeLoader(parser.SingleResultRule[Regex]):
         def __call__(self, state: tokens.TokenStream, scope: parser.Scope[Regex]) -> parser.StateAndResult[Regex]:
             state, _ = state.pop('[')
             state, start_token = state.pop('literal')
@@ -274,7 +274,7 @@ def load(input: str) -> Regex:
         def lexer(self) -> lexer_lib.Lexer:
             return lexer_lib.Lexer.literal('[', '-', ']') | literal_lex_rule
 
-    class SpecialLoader(parser.Rule[Regex]):
+    class SpecialLoader(parser.SingleResultRule[Regex]):
         def __call__(self, state: tokens.TokenStream, scope: parser.Scope[Regex]) -> parser.StateAndResult[Regex]:
             state, _ = state.pop('\\')
             state, token = state.pop()
@@ -288,13 +288,13 @@ def load(input: str) -> Regex:
         def lexer(self) -> lexer_lib.Lexer:
             return lexer_lib.Lexer.literal('\\')
 
-    def suffix_loader(operator: str, type: Type[_UnaryRegex]) -> parser.Rule[Regex]:
+    def suffix_loader(operator: str, type: Type[_UnaryRegex]) -> parser.SingleResultRule[Regex]:
         return parser.combine(
             parser.Ref[Regex]('operand'),
             operator,
         )
 
-    def prefix_loader(operator: str, type: Type[_UnaryRegex]) -> parser.Rule[Regex]:
+    def prefix_loader(operator: str, type: Type[_UnaryRegex]) -> parser.SingleResultRule[Regex]:
         return parser.Combiner[Regex].load(
             operator,
             parser.Combiner[Regex].Func(

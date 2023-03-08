@@ -41,7 +41,7 @@ class Arg:
         return vals.Arg(self.val.eval(scope))
 
     @staticmethod
-    def loader(scope: parser.Scope[Expr]) -> parser.Rule['Arg']:
+    def loader(scope: parser.Scope[Expr]) -> parser.SingleResultRule['Arg']:
         def inner(state: tokens.TokenStream, _: parser.Scope[Arg]) -> parser.StateAndResult[Arg]:
             state, val = Expr.load(state, scope)
             return state, Arg(val)
@@ -62,7 +62,7 @@ class Args(Sized, Iterable[Arg]):
         return vals.Args([arg.eval(scope) for arg in self.args])
 
     @staticmethod
-    def loader(expr_scope: parser.Scope[Expr]) -> parser.Rule['Args']:
+    def loader(expr_scope: parser.Scope[Expr]) -> parser.SingleResultRule['Args']:
         def inner(state: tokens.TokenStream, scope: parser.Scope[Args]) -> parser.StateAndResult[Args]:
             def load_args(state: tokens.TokenStream, scope: parser.Scope[Args]) -> parser.StateAndResult[Args]:
                 load_arg = Arg.loader(expr_scope)
@@ -151,7 +151,7 @@ class Ref(Expr):
 
         @classmethod
         @abstractmethod
-        def loader(cls, expr_scope: parser.Scope[Expr]) -> parser.Rule['Ref.Tail']:
+        def loader(cls, expr_scope: parser.Scope[Expr]) -> parser.SingleResultRule['Ref.Tail']:
             return parser.Or[Ref.Tail]([Ref.Member.loader(expr_scope), Ref.Call.loader(expr_scope)])
 
         @classmethod
@@ -170,7 +170,7 @@ class Ref(Expr):
             obj[self.name] = val
 
         @classmethod
-        def loader(cls, expr_scope: parser.Scope[Expr]) -> parser.Rule['Ref.Tail']:
+        def loader(cls, expr_scope: parser.Scope[Expr]) -> parser.SingleResultRule['Ref.Tail']:
             def load(state: tokens.TokenStream, scope: parser.Scope['Ref.Tail']) -> parser.StateAndResult['Ref.Tail']:
                 state, _ = state.pop('.')
                 state, name = parser.token_val(state, rule_name='id')
@@ -189,7 +189,7 @@ class Ref(Expr):
             return val(scope, self.args.eval(scope))
 
         @classmethod
-        def loader(cls, expr_scope: parser.Scope[Expr]) -> parser.Rule['Ref.Tail']:
+        def loader(cls, expr_scope: parser.Scope[Expr]) -> parser.SingleResultRule['Ref.Tail']:
             def load(state: tokens.TokenStream, scope: parser.Scope['Ref.Tail']) -> parser.StateAndResult['Ref.Tail']:
                 state, args = Args.loader(expr_scope)(
                     state, parser.Scope[Args]())

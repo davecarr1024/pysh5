@@ -13,7 +13,7 @@ if 'unittest.util' in __import__('sys').modules:
 class Val(ABC):
     @classmethod
     @abstractmethod
-    def loader(cls) -> parser.Rule['Val']:
+    def loader(cls) -> parser.SingleResultRule['Val']:
         return parser.Parser[Val](
             'val',
             parser.Scope[Val]({
@@ -41,7 +41,7 @@ class Int(Val):
             raise errors.Error(msg=f'failed to load int: {error}')
 
     @classmethod
-    def loader(cls) -> parser.Rule[Val]:
+    def loader(cls) -> parser.SingleResultRule[Val]:
         return parser.Literal[Val](lexer.Rule.load('int', '(\\-)?(\\d)+'), Int._convert_token)
 
 
@@ -54,7 +54,7 @@ class Str(Val):
         return Str(token.val[1:-1])
 
     @classmethod
-    def loader(cls) -> parser.Rule[Val]:
+    def loader(cls) -> parser.SingleResultRule[Val]:
         return parser.Literal[Val](lexer.Rule.load('str', '"(^")*"'), Str._convert_token)
 
 
@@ -63,7 +63,7 @@ class List(Val):
     vals: Sequence[Val] = field(default_factory=list[Val])
 
     @classmethod
-    def loader(cls) -> parser.Rule[Val]:
+    def loader(cls) -> parser.SingleResultRule[Val]:
         return parser.Combiner[Val].load(
             '[',
             parser.Combiner[Val].load(
