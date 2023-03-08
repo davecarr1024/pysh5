@@ -64,25 +64,21 @@ class List(Val):
 
     @classmethod
     def loader(cls) -> parser.SingleResultRule[Val]:
-        return parser.Combiner[Val].load(
+        return parser.combine(
             '[',
-            parser.Combiner[Val].load(
-                parser.Combiner[Val].Func(
-                    parser.MultipleResultCombiner[Val].load(
-                        parser.Ref[Val]('val'),
-                        parser.ZeroOrMore(
-                            parser.Combiner[Val].load(
-                                ',',
-                                parser.Ref[Val]('val'),
-                            ),
-                        ),
+            parser.ZeroOrOne[Val](
+                parser.combine(
+                    parser.Ref[Val]('val'),
+                    parser.ZeroOrMore[Val](
+                        parser.combine(
+                            ',',
+                            parser.Ref[Val]('val'),
+                        ).single()
                     ),
-                    List,
-                ),
-            ),
+                ).convert(List)
+            ).single(List()),
             ']',
-            _lexer=lexer.Lexer([lexer.Rule.whitespace()]),
-        )
+        ).single()
 
 
 class ScopeTest(TestCase):
