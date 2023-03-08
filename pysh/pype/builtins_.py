@@ -62,7 +62,7 @@ class Object(classes.Object, ABC):
     @classmethod
     @abstractmethod
     def loader(cls) -> parser.SingleResultRule[vals.Val]:
-        return cls.parser_()
+        ...
 
 
 _BuiltinValue = TypeVar('_BuiltinValue')
