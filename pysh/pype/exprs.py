@@ -139,7 +139,7 @@ class Ref(Expr):
 
         @classmethod
         def lexer_(cls) -> lexer.Lexer:
-            return builtins_.Object.lexer_()
+            return builtins_.Object.lexer()
 
     class Tail(ABC):
         @abstractmethod

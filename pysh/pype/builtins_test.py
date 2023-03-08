@@ -39,7 +39,7 @@ class ObjectTest(TestCase):
             with self.subTest(state=state, expected=expected):
                 if expected is None:
                     with self.assertRaises(errors.Error):
-                        builtins_.Object.parser_()(builtins_.Object.lexer_()(state))
+                        builtins_.Object.parser_()(state)
                 else:
-                    self.assertEqual(builtins_.Object.parser_()(
-                        builtins_.Object.lexer_()(state)), expected)
+                    self.assertEqual(
+                        builtins_.Object.parser_()(state), expected)

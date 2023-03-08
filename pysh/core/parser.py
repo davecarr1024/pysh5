@@ -67,13 +67,13 @@ class ParseError(errors.UnaryError):
 
 @dataclass(frozen=True)
 class Scope(Generic[_Result]):
-    rules: Mapping[str, 'Rule[_Result]'] = field(
-        default_factory=dict[str, 'Rule[_Result]'])
+    rules: Mapping[str, 'SingleResultRule[_Result]'] = field(
+        default_factory=dict[str, 'SingleResultRule[_Result]'])
 
     def __len__(self) -> int:
         return len(self.rules)
 
-    def __getitem__(self, name: str) -> 'Rule[_Result]':
+    def __getitem__(self, name: str) -> 'SingleResultRule[_Result]':
         if name not in self.rules:
             raise errors.Error(msg=f'unknown rule {name}')
         return self.rules[name]
@@ -172,6 +172,18 @@ class SingleResultRule(Rule[_Result]):
                 return self.child.lexer
 
         return Adapter[_Result](self, func)
+
+    def zero_or_more(self) -> 'ZeroOrMore[_Result]':
+        return ZeroOrMore[_Result](self)
+
+    def one_or_more(self) -> 'OneOrMore[_Result]':
+        return OneOrMore[_Result](self)
+
+    def zero_or_one(self) -> 'ZeroOrOne[_Result]':
+        return ZeroOrOne[_Result](self)
+
+    def until_empty(self) -> 'UntilEmpty[_Result]':
+        return UntilEmpty[_Result](self)
 
 
 class OptionalResultRule(Rule[_Result]):
@@ -518,7 +530,7 @@ class UntilEmpty(MultipleResultRule[_Result]):
 
 
 @dataclass(frozen=True)
-class Parser(Generic[_Result], SingleResultRule[_Result], Mapping[str, Rule[_Result]]):
+class Parser(Generic[_Result], SingleResultRule[_Result], Mapping[str, SingleResultRule[_Result]]):
     root_rule_name: str
     scope: Scope[_Result]
 
@@ -528,7 +540,7 @@ class Parser(Generic[_Result], SingleResultRule[_Result], Mapping[str, Rule[_Res
     def __iter__(self) -> Iterator[str]:
         return iter(self.scope)
 
-    def __getitem__(self, name: str) -> Rule[_Result]:
+    def __getitem__(self, name: str) -> SingleResultRule[_Result]:
         return self.scope[name]
 
     def __call__(

@@ -46,28 +46,23 @@ class Object(classes.Object, ABC):
         ...
 
     @staticmethod
-    def parser_() -> parser.Parser[classes.Object]:
-        return parser.Parser[classes.Object](
+    def parser_() -> parser.Parser[vals.Val]:
+        return parser.Parser[vals.Val](
             'object',
-            parser.Scope[classes.Object]({
-                'object': Object.load,
-                'int': _IntObject.load,
-                'none': _NoneObject.load,
-            }),
+            parser.Scope[vals.Val]({
+                'object': parser.Or[vals.Val]([
+                    parser.Ref[vals.Val]('int'),
+                    parser.Ref[vals.Val]('none'),
+                ]),
+                'int': _IntObject.loader(),
+                'none': _NoneObject.loader(),
+            })
         )
 
     @classmethod
     @abstractmethod
-    def load(cls, state: tokens.TokenStream, scope: parser.Scope[classes.Object]) -> parser.StateAndResult[classes.Object]:
-        return parser.Or[classes.Object]([
-            parser.Ref[classes.Object]('int'),
-            parser.Ref[classes.Object]('none'),
-        ])(state, scope)
-
-    @classmethod
-    @abstractmethod
-    def lexer_(cls) -> lexer.Lexer:
-        return _IntObject.lexer_() | _NoneObject.lexer_()
+    def loader(cls) -> parser.SingleResultRule[vals.Val]:
+        return cls.parser_()
 
 
 _BuiltinValue = TypeVar('_BuiltinValue')
@@ -118,12 +113,18 @@ class _IntObject(_ValueObject[int]):
         raise errors.Error(msg=f'can''t convert {val} to int')
 
     @classmethod
-    def load(cls, state: tokens.TokenStream, scope: parser.Scope[classes.Object]) -> parser.StateAndResult[classes.Object]:
-        return parser.Literal[classes.Object]('int', lambda token: int_(int(token.val)))(state, scope)
+    def loader(cls) -> parser.SingleResultRule[vals.Val]:
+        def convert_token(token: tokens.Token) -> vals.Val:
+            try:
+                return int_(int(token.val))
+            except ValueError as error:
+                raise errors.Error(
+                    msg=f'failed to read int literal {token}: {error}')
 
-    @classmethod
-    def lexer_(cls) -> lexer.Lexer:
-        return lexer.Lexer([lexer.Rule('int', regex.load('(\\-)?[0-9]+'))])
+        return parser.Literal[vals.Val](
+            lexer.Rule.load('int', '(\\-)?(\\d)+'),
+            convert_token
+        )
 
 
 _IntClass = _Class(
@@ -145,12 +146,11 @@ class _NoneObject(Object):
         return None
 
     @classmethod
-    def load(cls, state: tokens.TokenStream, scope: parser.Scope[classes.Object]) -> parser.StateAndResult[classes.Object]:
-        return parser.Literal[classes.Object]('none', lambda _: none)(state, scope)
-
-    @classmethod
-    def lexer_(cls) -> lexer.Lexer:
-        return lexer.Lexer([lexer.Rule('none', regex.literal('none'))])
+    def loader(cls) -> parser.SingleResultRule[vals.Val]:
+        return parser.Literal[vals.Val](
+            lexer.Rule.load('none'),
+            lambda _: none
+        )
 
 
 _NoneClass = _Class(
