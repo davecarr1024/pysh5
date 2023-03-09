@@ -648,38 +648,20 @@ class Literal(AbstractLiteral[_Result]):
         return self.convert_result(token)
 
 
+_ChildRuleType = TypeVar('_ChildRuleType', bound=Rule)
+
+
 @dataclass(frozen=True)
-class Or(SingleResultRule[_Result]):
-    children: Sequence[SingleResultRule[_Result]]
-
-    def __str__(self) -> str:
-        return f"({' | '.join(map(str,self.children))})"
-
-    def __or__(self, rhs: SingleResultRule[_Result]) -> 'Or[_Result]':
-        return Or[_Result](list(self.children)+[rhs])
-
-    def __call__(self, state: tokens.TokenStream, scope: Scope[_Result]) -> StateAndResult[_Result]:
-        child_errors: MutableSequence[errors.Error] = []
-        for child in self.children:
-            try:
-                return child(state, scope)
-            except errors.Error as error:
-                child_errors.append(error)
-        raise RuleError(
-            rule=self, state=state, children=child_errors)
+class _UnaryRule(Generic[_Result, _ChildRuleType], Rule[_Result]):
+    child: _ChildRuleType
 
     @property
     def lexer_(self) -> lexer.Lexer:
-        lexer_ = lexer.Lexer()
-        for child in self.children:
-            lexer_ |= child.lexer_
-        return lexer_
+        return self.child.lexer_
 
 
 @dataclass(frozen=True)
-class ZeroOrMore(MultipleResultRule[_Result]):
-    child: SingleResultRule[_Result]
-
+class ZeroOrMore(_UnaryRule[_Result, SingleResultRule[_Result]], MultipleResultRule[_Result]):
     def __str__(self) -> str:
         return f'{self.child}*'
 
@@ -698,9 +680,7 @@ class ZeroOrMore(MultipleResultRule[_Result]):
 
 
 @dataclass(frozen=True)
-class OneOrMore(MultipleResultRule[_Result]):
-    child: SingleResultRule[_Result]
-
+class OneOrMore(_UnaryRule[_Result, SingleResultRule[_Result]], MultipleResultRule[_Result]):
     def __str__(self) -> str:
         return f'{self.child}+'
 
@@ -718,15 +698,9 @@ class OneOrMore(MultipleResultRule[_Result]):
             except errors.Error:
                 return state, results
 
-    @property
-    def lexer_(self) -> lexer.Lexer:
-        return self.child.lexer_
-
 
 @dataclass(frozen=True)
-class ZeroOrOne(OptionalResultRule[_Result]):
-    child: SingleResultRule[_Result]
-
+class ZeroOrOne(_UnaryRule[_Result, SingleResultRule[_Result]], OptionalResultRule[_Result]):
     def __str__(self) -> str:
         return f'{self.child}?'
 
@@ -736,15 +710,9 @@ class ZeroOrOne(OptionalResultRule[_Result]):
         except errors.Error:
             return state, None
 
-    @property
-    def lexer_(self) -> lexer.Lexer:
-        return self.child.lexer_
-
 
 @dataclass(frozen=True)
-class UntilEmpty(MultipleResultRule[_Result]):
-    child: SingleResultRule[_Result]
-
+class UntilEmpty(_UnaryRule[_Result, SingleResultRule[_Result]], MultipleResultRule[_Result]):
     def __str__(self) -> str:
         return f'{self.child}!'
 
@@ -758,10 +726,6 @@ class UntilEmpty(MultipleResultRule[_Result]):
                 raise RuleError(
                     rule=self, state=state, children=[error])
         return state, results
-
-    @property
-    def lexer_(self) -> lexer.Lexer:
-        return self.child.lexer_
 
 
 @dataclass(frozen=True)
@@ -825,9 +789,6 @@ class LexRule(NoResultRule[_Result]):
         if isinstance(val, str):
             val = lexer.Rule.load(val)
         return LexRule[_Result](val)
-
-
-_ChildRuleType = TypeVar('_ChildRuleType', bound=Rule)
 
 
 @dataclass(frozen=True)
@@ -1121,3 +1082,29 @@ class MultipleResultAnd(_AbstractAnd[_Result, Rule[_Result]], MultipleResultRule
             except errors.Error as error:
                 raise RuleError(rule=self, state=state, children=[error])
         return state, results
+
+
+@dataclass(frozen=True)
+class Or(_NaryRule[_Result, SingleResultRule[_Result]], SingleResultRule[_Result]):
+    def __str__(self) -> str:
+        return f"({' | '.join(map(str,self.children))})"
+
+    def __or__(self, rhs: SingleResultRule[_Result]) -> 'Or[_Result]':
+        return Or[_Result](list(self.children)+[rhs])
+
+    def __call__(self, state: tokens.TokenStream, scope: Scope[_Result]) -> StateAndResult[_Result]:
+        child_errors: MutableSequence[errors.Error] = []
+        for child in self.children:
+            try:
+                return child(state, scope)
+            except errors.Error as error:
+                child_errors.append(error)
+        raise RuleError(
+            rule=self, state=state, children=child_errors)
+
+    @property
+    def lexer_(self) -> lexer.Lexer:
+        lexer_ = lexer.Lexer()
+        for child in self.children:
+            lexer_ |= child.lexer_
+        return lexer_
