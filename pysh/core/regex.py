@@ -271,7 +271,7 @@ def load(input: str) -> Regex:
             return state, Range(start_token.val, end_token.val)
 
         @property
-        def lexer(self) -> lexer_lib.Lexer:
+        def lexer_(self) -> lexer_lib.Lexer:
             return lexer_lib.Lexer.literal('[', '-', ']') | literal_lex_rule
 
     class SpecialLoader(parser.SingleResultRule[Regex]):
@@ -285,19 +285,19 @@ def load(input: str) -> Regex:
             return state, literal(token.val)
 
         @property
-        def lexer(self) -> lexer_lib.Lexer:
+        def lexer_(self) -> lexer_lib.Lexer:
             return lexer_lib.Lexer.literal('\\')
 
     def suffix_loader(operator: str, type: Type[_UnaryRegex]) -> parser.SingleResultRule[Regex]:
-        return parser.combine(
-            parser.Ref[Regex]('operand'),
-            operator,
+        return (
+            parser.Ref[Regex]('operand')
+            & operator
         ).single().convert(type)
 
     def prefix_loader(operator: str, type: Type[_UnaryRegex]) -> parser.SingleResultRule[Regex]:
-        return parser.combine(
-            operator,
-            parser.Ref[Regex]('operand'),
+        return (
+            operator &
+            parser.Ref[Regex]('operand')
         ).single().convert(type)
 
     _, result = parser.Parser[Regex](
@@ -306,47 +306,42 @@ def load(input: str) -> Regex:
             'root': parser.UntilEmpty[Regex](
                 parser.Ref[Regex]('regex')
             ).convert(and_args),
-            'regex': parser.Or[Regex]([
-                parser.Ref[Regex]('operation'),
-                parser.Ref[Regex]('operand'),
-            ]),
-            'operation': parser.Or[Regex]([
-                suffix_loader('*', ZeroOrMore),
-                suffix_loader('+', OneOrMore),
-                suffix_loader('?', ZeroOrOne),
-                suffix_loader('!', UntilEmpty),
-                prefix_loader('^', Not),
-                prefix_loader('~', Skip),
-            ]),
-            'operand': parser.Or[Regex]([
-                parser.Ref[Regex]('any'),
-                parser.Ref[Regex]('special'),
-                parser.Ref[Regex]('or'),
-                parser.Ref[Regex]('and'),
-                parser.Ref[Regex]('range'),
-                parser.Ref[Regex]('literal'),
-            ]),
+            'regex': (
+                parser.Ref[Regex]('operation')
+                | parser.Ref[Regex]('operand')
+            ),
+            'operation': (
+                suffix_loader('*', ZeroOrMore)
+                | suffix_loader('+', OneOrMore)
+                | suffix_loader('?', ZeroOrOne)
+                | suffix_loader('!', UntilEmpty)
+                | prefix_loader('^', Not)
+                | prefix_loader('~', Skip)
+            ),
+            'operand': (
+                parser.Ref[Regex]('any')
+                | parser.Ref[Regex]('special')
+                | parser.Ref[Regex]('or')
+                | parser.Ref[Regex]('and')
+                | parser.Ref[Regex]('range')
+                | parser.Ref[Regex]('literal')
+            ),
             'special': SpecialLoader(),
             'any': parser.Literal(lexer_lib.Rule.load('.'), lambda _: Any()),
             'range': RangeLoader(),
-            'and':
-            parser.combine(
-                '(',
-                parser.OneOrMore[Regex](
-                    parser.Ref[Regex]('regex')
-                ),
-                ')',
+            'and': (
+                '('
+                & parser.Ref[Regex]('regex').one_or_more()
+                & ')'
             ).convert(and_args),
-            'or': parser.combine(
-                '(',
-                parser.Ref[Regex]('regex'),
-                parser.OneOrMore(
-                    parser.combine(
-                        '|',
-                        parser.Ref[Regex]('regex'),
-                    ).single()
-                ),
-                ')',
+            'or': (
+                '('
+                & parser.Ref[Regex]('regex')
+                & (
+                    '|'
+                    & parser.Ref[Regex]('regex')
+                ).single().one_or_more()
+                & ')'
             ).convert(Or),
             'literal': parser.Literal(
                 literal_lex_rule,

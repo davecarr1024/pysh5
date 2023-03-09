@@ -17,11 +17,11 @@ class Val(ABC):
         return parser.Parser[Val](
             'val',
             parser.Scope[Val]({
-                'val': parser.Or[Val]([
-                    parser.Ref[Val]('int'),
-                    parser.Ref[Val]('str'),
-                    parser.Ref[Val]('list'),
-                ]),
+                'val': (
+                    parser.Ref[Val]('int')
+                    | parser.Ref[Val]('str')
+                    | parser.Ref[Val]('list')
+                ),
                 'int': Int.loader(),
                 'str': Str.loader(),
                 'list': List.loader(),
@@ -64,21 +64,16 @@ class List(Val):
 
     @classmethod
     def loader(cls) -> parser.SingleResultRule[Val]:
-        return parser.combine(
-            '[',
-            parser.ZeroOrOne[Val](
-                parser.combine(
-                    parser.Ref[Val]('val'),
-                    parser.ZeroOrMore[Val](
-                        parser.combine(
-                            ',',
-                            parser.Ref[Val]('val'),
-                        ).single()
-                    ),
-                ).convert(List)
-            ).single(List()),
-            ']',
-            _lexer=lexer.Lexer([lexer.Rule.whitespace()]),
+        return (
+            '['
+            & (
+                parser.Ref[Val]('val')
+                & (
+                    ','
+                    & parser.Ref[Val]('val')
+                ).single().zero_or_more()
+            ).convert(List).zero_or_one().single(List())
+            & ']'
         ).single()
 
 
@@ -113,13 +108,13 @@ class ValTest(TestCase):
                 List([Int(1)])
             ),
             (
-                '[1, "a"]',
+                '[1,"a"]',
                 List([Int(1), Str('a')])
             ),
         ]):
             with self.subTest(state=state, expected=expected):
                 if isinstance(state, str):
-                    state = Val.loader().lexer(state)
+                    state = Val.loader().lexer_(state)
                 if expected is None:
                     with self.assertRaises(errors.Error):
                         Val.loader()(state, parser.Scope[Val]())
@@ -130,3 +125,54 @@ class ValTest(TestCase):
                         Val.loader()(state, parser.Scope[Val]()),
                         expected
                     )
+
+
+class ParserTest(TestCase):
+    def test_apply(self):
+        for rule, state, scope, expected in list[tuple[parser.SingleResultRule[Val], tokens.TokenStream, parser.Scope[Val], Optional[parser.StateAndResult[Val]]]]([
+            (
+                parser.Ref[Val]('int'),
+                tokens.TokenStream([
+                    tokens.Token('int', '1'),
+                ]),
+                parser.Scope[Val]({
+                    'int': Int.loader(),
+                }),
+                (
+                    tokens.TokenStream([]),
+                    Int(1),
+                ),
+            ),
+            (
+                parser.Literal[Val](
+                    lexer.Rule.load('a'),
+                    lambda _: Int(1),
+                ),
+                tokens.TokenStream([
+                    tokens.Token('a', 'a'),
+                ]),
+                parser.Scope({}),
+                (
+                    tokens.TokenStream([]),
+                    Int(1),
+                ),
+            ),
+            (
+                (Int.loader() & Int.loader()).convert(List),
+                tokens.TokenStream([
+                    tokens.Token('int', '1'),
+                    tokens.Token('int', '2'),
+                ]),
+                parser.Scope({}),
+                (
+                    tokens.TokenStream([]),
+                    List([Int(1), Int(2)]),
+                )
+            )
+        ]):
+            with self.subTest(rule=rule, state=state, scope=scope, expected=expected):
+                if expected is None:
+                    with self.assertRaises(errors.Error):
+                        rule(state, scope)
+                else:
+                    self.assertEqual(rule(state, scope), expected)
