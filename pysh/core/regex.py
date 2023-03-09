@@ -43,17 +43,16 @@ class Result(Sized, Iterable[chars.Char]):
 
 
 StateAndResult = tuple[chars.CharStream, Result]
-Regex = Callable[[chars.CharStream], StateAndResult]
 
 
-class _AbstractRegex(ABC):
+class Regex(ABC):
     @abstractmethod
     def __call__(self, state: chars.CharStream) -> StateAndResult:
         ...
 
 
 @dataclass(frozen=True)
-class Any(_AbstractRegex):
+class Any(Regex):
     def __str__(self) -> str:
         return '.'
 
@@ -62,7 +61,7 @@ class Any(_AbstractRegex):
 
 
 @dataclass(frozen=True)
-class Literal(_AbstractRegex):
+class Literal(Regex):
     val: str
 
     def __post_init__(self):
@@ -86,7 +85,7 @@ def literal(val: str) -> Regex:
 
 
 @dataclass(frozen=True)
-class Range(_AbstractRegex):
+class Range(Regex):
     start: str
     end: str
 
@@ -104,7 +103,7 @@ class Range(_AbstractRegex):
 
 
 @dataclass(frozen=True)
-class _NaryRegex(_AbstractRegex):
+class _NaryRegex(Regex):
     children: Sequence[Regex]
 
 
@@ -140,7 +139,7 @@ class Or(_NaryRegex):
 
 
 @dataclass(frozen=True)
-class _UnaryRegex(_AbstractRegex):
+class _UnaryRegex(Regex):
     child: Regex
 
 
@@ -232,7 +231,7 @@ class Skip(_UnaryRegex):
 
 
 @dataclass(frozen=True)
-class Whitespace(_AbstractRegex):
+class Whitespace(Regex):
     def __str__(self) -> str:
         return '\\w'
 

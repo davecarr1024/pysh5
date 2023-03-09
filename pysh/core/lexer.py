@@ -36,7 +36,10 @@ class Rule:
     regex_: regex.Regex
 
     def __str__(self) -> str:
-        return f'{self.name}={self.regex_}'
+        if self.name == str(self.regex_):
+            return repr(self.name)
+        else:
+            return f'{self.name}={repr(str(self.regex_))}'
 
     def __call__(self, state: chars.CharStream) -> StateAndResult:
         try:

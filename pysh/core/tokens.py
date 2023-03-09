@@ -10,7 +10,10 @@ class Token:
     position: chars.Position = field(default_factory=chars.Position)
 
     def __str__(self) -> str:
-        return f'{self.rule_name}({self.val})'
+        if self.rule_name == self.val:
+            return repr(self.rule_name)
+        else:
+            return f'{self.rule_name}({repr(str(self.val))})'
 
     @staticmethod
     def load(rule_name: str, val: Sequence[chars.Char] | chars.CharStream) -> 'Token':
