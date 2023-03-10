@@ -35,6 +35,13 @@ class ObjectTest(TestCase):
                     builtins_.int_(1),
                 ),
             ),
+            (
+                'none',
+                (
+                    tokens.TokenStream([]),
+                    builtins_.none,
+                ),
+            ),
         ]):
             with self.subTest(state=state, expected=expected):
                 if expected is None:

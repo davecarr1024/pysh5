@@ -1,8 +1,8 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 import operator
-from typing import Any, Callable, Generic, Mapping, Type, TypeVar
-from ..core import errors, lexer,  parser, regex, tokens
+from typing import Any, Callable, Generic, Mapping, Sequence, Type, TypeVar
+from ..core import errors, lexer,  parser, tokens
 from . import classes, funcs, vals
 
 
@@ -21,12 +21,18 @@ class _Class(classes.AbstractClass):
         return self._members
 
     @property
-    def object_type(self) -> Type['classes.Object']:
+    def object_type(self) -> Type['Object']:
         return self._object_type
+
+    def instantiate(self, *args: Any, **kwargs: Any) -> 'Object':
+        object_ = self.object_type(
+            self, self.members.as_child(), *args, **kwargs)
+        object_.members.bind(object_)
+        return object_
 
 
 @dataclass(frozen=True)
-class Object(classes.Object, ABC):
+class Object(parser.Parsable['Object'], classes.Object, ABC):
     class_: classes.AbstractClass = field(compare=False, repr=False)
     _members: vals.Scope = field(compare=False, repr=False)
 
@@ -45,24 +51,12 @@ class Object(classes.Object, ABC):
     def from_val(cls, scope: vals.Scope, val: vals.Val) -> Any:
         ...
 
-    @staticmethod
-    def parser_() -> parser.Parser[vals.Val]:
-        return parser.Parser[vals.Val](
-            'object',
-            parser.Scope[vals.Val]({
-                'object': (
-                    parser.Ref[vals.Val]('int')
-                    | parser.Ref[vals.Val]('none')
-                ),
-                'int': _IntObject.loader(),
-                'none': _NoneObject.loader(),
-            })
-        )
-
     @classmethod
-    @abstractmethod
-    def loader(cls) -> parser.SingleResultRule[vals.Val]:
-        ...
+    def types(cls) -> Sequence[Type['Object']]:
+        return [
+            _IntObject,
+            _NoneObject,
+        ]
 
 
 _BuiltinValue = TypeVar('_BuiltinValue')
@@ -113,15 +107,15 @@ class _IntObject(_ValueObject[int]):
         raise errors.Error(msg=f'can''t convert {val} to int')
 
     @classmethod
-    def loader(cls) -> parser.SingleResultRule[vals.Val]:
-        def convert_token(token: tokens.Token) -> vals.Val:
+    def parse_rule(cls) -> parser.SingleResultRule[Object]:
+        def convert_token(token: tokens.Token) -> Object:
             try:
                 return int_(int(token.val))
             except ValueError as error:
                 raise errors.Error(
                     msg=f'failed to read int literal {token}: {error}')
 
-        return parser.Literal[vals.Val](
+        return parser.Literal[Object](
             lexer.Rule.load('int', '(\\-)?(\\d)+'),
             convert_token
         )
@@ -136,7 +130,7 @@ _IntClass = _Class(
 )
 
 
-def int_(val: int) -> classes.Object:
+def int_(val: int) -> Object:
     return _IntClass.instantiate(val)
 
 
@@ -146,8 +140,8 @@ class _NoneObject(Object):
         return None
 
     @classmethod
-    def loader(cls) -> parser.SingleResultRule[vals.Val]:
-        return parser.Literal[vals.Val](
+    def parse_rule(cls) -> parser.SingleResultRule[Object]:
+        return parser.Literal[Object](
             lexer.Rule.load('none'),
             lambda _: none
         )
