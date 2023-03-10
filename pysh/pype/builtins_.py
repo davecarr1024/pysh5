@@ -50,10 +50,10 @@ class Object(classes.Object, ABC):
         return parser.Parser[vals.Val](
             'object',
             parser.Scope[vals.Val]({
-                'object': parser.Or[vals.Val]([
-                    parser.Ref[vals.Val]('int'),
-                    parser.Ref[vals.Val]('none'),
-                ]),
+                'object': (
+                    parser.Ref[vals.Val]('int')
+                    | parser.Ref[vals.Val]('none')
+                ),
                 'int': _IntObject.loader(),
                 'none': _NoneObject.loader(),
             })

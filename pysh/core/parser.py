@@ -1108,3 +1108,37 @@ class Or(_NaryRule[_Result, SingleResultRule[_Result]], SingleResultRule[_Result
         for child in self.children:
             lexer_ |= child.lexer_
         return lexer_
+
+
+_ParsableType = TypeVar('_ParsableType', bound='Parsable')
+
+
+class Parsable(ABC, Generic[_ParsableType]):
+    @classmethod
+    def _name(cls) -> str:
+        return cls.__name__
+
+    @classmethod
+    def ref(cls) -> Ref[_ParsableType]:
+        return Ref[_ParsableType](cls._name())
+
+    @classmethod
+    @abstractmethod
+    def parse_rule(cls) -> SingleResultRule[_ParsableType]:
+        ...
+
+    @classmethod
+    @abstractmethod
+    def types(cls) -> Sequence[Type[_ParsableType]]:
+        ...
+
+    @classmethod
+    def parser_(cls) -> Parser[_ParsableType]:
+        return Parser[_ParsableType](
+            cls._name(),
+            Scope[_ParsableType](
+                {cls._name(): Or[_ParsableType]([type.ref() for type in cls.types()])} |
+                {type._name(): type.parse_rule()
+                 for type in cls.types()}
+            )
+        )

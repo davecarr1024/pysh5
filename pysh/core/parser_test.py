@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import MutableSequence, Optional, Sequence, Union
+from typing import MutableSequence, Optional, Sequence, Type, Union
 from unittest import TestCase
 from . import errors, lexer, parser, tokens
 
@@ -9,23 +9,65 @@ if 'unittest.util' in __import__('sys').modules:
     __import__('sys').modules['unittest.util']._MAX_LENGTH = 999999999
 
 
-class Val:
-    ...
+class Val(parser.Parsable['Val']):
+    @classmethod
+    def types(cls) -> Sequence[Type['Val']]:
+        return [
+            Int,
+            Str,
+            List,
+        ]
 
 
 @dataclass(frozen=True)
 class Int(Val):
     val: int
 
+    @classmethod
+    def parse_rule(cls) -> parser.SingleResultRule[Val]:
+        def convert_token(token: tokens.Token) -> Int:
+            try:
+                return Int(int(token.val))
+            except ValueError as error:
+                raise errors.Error(
+                    msg=f'failed to convert int token {token}: {error}')
+
+        return parser.Literal[Val](
+            lexer.Rule.load('int', '\\d+'),
+            convert_token,
+
+        )
+
 
 @dataclass(frozen=True)
 class Str(Val):
     val: str
 
+    @classmethod
+    def parse_rule(cls) -> parser.SingleResultRule[Val]:
+        return parser.Literal[Val](
+            lexer.Rule.load('str', '"(^")*"'),
+            lambda token: Str(token.val[1:-1]),
+        )
+
 
 @dataclass(frozen=True)
 class List(Val):
     vals: Sequence[Val]
+
+    @classmethod
+    def parse_rule(cls) -> parser.SingleResultRule[Val]:
+        return (
+            '[' &
+            (
+                Val.ref() &
+                (
+                    ',' &
+                    Val.ref()
+                ).zero_or_more()
+            ).convert(List).zero_or_one().single_or(List([])) &
+            ']'
+        )
 
 
 def tok(rule_name: str, val: Optional[str] = None) -> tokens.Token:
@@ -720,48 +762,9 @@ class RuleTest(TestCase):
                 self.assertEqual(lhs | rhs, expected)
 
     def test_call(self):
-        def convert_int_tok(token: tokens.Token) -> Int:
-            try:
-                return Int(int(token.val))
-            except ValueError as error:
-                raise errors.Error(
-                    msg=f'failed to convert int token {token}: {error}')
-
-        load_int: parser.SingleResultRule[Val] = parser.Literal[Val](
-            lexer.Rule.load('int', '\\d+'),
-            convert_int_tok,
-        )
-
-        load_str: parser.SingleResultRule[Val] = parser.Literal[Val](
-            lexer.Rule.load('str', '"(^")*"'),
-            lambda token: Str(token.val[1:-1]),
-        )
-
-        load_list: parser.SingleResultRule[Val] = (
-            '[' &
-            (
-                parser.Ref[Val]('val') &
-                (
-                    ',' &
-                    parser.Ref[Val]('val')
-                ).zero_or_more()
-            ).convert(List).zero_or_one().single_or(List([])) &
-            ']'
-        )
-
-        parser_ = parser.Parser(
-            'val',
-            parser.Scope[Val]({
-                'val': (
-                    parser.Ref[Val]('int') |
-                    parser.Ref[Val]('str') |
-                    parser.Ref[Val]('list')
-                ),
-                'int': load_int,
-                'str': load_str,
-                'list': load_list,
-            })
-        )
+        load_int: parser.SingleResultRule[Val] = Int.parse_rule()
+        load_str: parser.SingleResultRule[Val] = Str.parse_rule()
+        parser_: parser.Parser[Val] = Val.parser_()
 
         for rule, state, scope, expected in list[tuple[
             parser.SingleResultRule[Val],
