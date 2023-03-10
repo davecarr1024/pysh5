@@ -261,7 +261,7 @@ def load(input: str) -> Regex:
     )
 
     class RangeLoader(parser.SingleResultRule[Regex]):
-        def __call__(self, state: tokens.TokenStream, scope: parser.Scope[Regex]) -> parser.StateAndResult[Regex]:
+        def __call__(self, state: tokens.TokenStream, scope: parser.Scope[Regex]) -> parser.StateAndSingleResult[Regex]:
             state, _ = state.pop('[')
             state, start_token = state.pop('literal')
             state, _ = state.pop('-')
@@ -274,7 +274,7 @@ def load(input: str) -> Regex:
             return lexer_lib.Lexer.literal('[', '-', ']') | literal_lex_rule
 
     class SpecialLoader(parser.SingleResultRule[Regex]):
-        def __call__(self, state: tokens.TokenStream, scope: parser.Scope[Regex]) -> parser.StateAndResult[Regex]:
+        def __call__(self, state: tokens.TokenStream, scope: parser.Scope[Regex]) -> parser.StateAndSingleResult[Regex]:
             state, _ = state.pop('\\')
             state, token = state.pop()
             if token.val == 'w':

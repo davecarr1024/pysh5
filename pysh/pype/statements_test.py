@@ -75,7 +75,7 @@ class BlockTest(TestCase):
 
 class StatementTest(TestCase):
     def test_load(self):
-        for state, expected in list[tuple[tokens.TokenStream, Optional[parser.StateAndResult[statements.Statement]]]]([
+        for state, expected in list[tuple[tokens.TokenStream, Optional[parser.StateAndSingleResult[statements.Statement]]]]([
             (
                 tokens.TokenStream([]),
                 (

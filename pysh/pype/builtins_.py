@@ -107,7 +107,7 @@ class _IntObject(_ValueObject[int]):
         raise errors.Error(msg=f'can''t convert {val} to int')
 
     @classmethod
-    def parse_rule(cls) -> parser.SingleResultRule[Object]:
+    def _parse_rule(cls) -> parser.SingleResultRule[Object]:
         def convert_token(token: tokens.Token) -> Object:
             try:
                 return int_(int(token.val))
@@ -140,7 +140,7 @@ class _NoneObject(Object):
         return None
 
     @classmethod
-    def parse_rule(cls) -> parser.SingleResultRule[Object]:
+    def _parse_rule(cls) -> parser.SingleResultRule[Object]:
         return parser.Literal[Object](
             lexer.Rule.load('none'),
             lambda _: none
@@ -148,7 +148,7 @@ class _NoneObject(Object):
 
 
 _NoneClass = _Class(
-    'None',
+    'none',
     vals.Scope({}),
     _NoneObject,
 )

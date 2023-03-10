@@ -24,7 +24,7 @@ class Int(Val):
     val: int
 
     @classmethod
-    def parse_rule(cls) -> parser.SingleResultRule[Val]:
+    def _parse_rule(cls) -> parser.SingleResultRule[Val]:
         def convert_token(token: tokens.Token) -> Int:
             try:
                 return Int(int(token.val))
@@ -44,7 +44,7 @@ class Str(Val):
     val: str
 
     @classmethod
-    def parse_rule(cls) -> parser.SingleResultRule[Val]:
+    def _parse_rule(cls) -> parser.SingleResultRule[Val]:
         return parser.Literal[Val](
             lexer.Rule.load('str', '"(^")*"'),
             lambda token: Str(token.val[1:-1]),
@@ -56,7 +56,7 @@ class List(Val):
     vals: Sequence[Val]
 
     @classmethod
-    def parse_rule(cls) -> parser.SingleResultRule[Val]:
+    def _parse_rule(cls) -> parser.SingleResultRule[Val]:
         return (
             '[' &
             (
@@ -68,6 +68,23 @@ class List(Val):
             ).convert(List).zero_or_one().single_or(List([])) &
             ']'
         )
+
+
+class Expr(parser.Parsable['Expr']):
+    @classmethod
+    def types(cls) -> Sequence[Type['Expr']]:
+        return [
+            Literal,
+        ]
+
+
+@dataclass(frozen=True)
+class Literal(Expr):
+    val: Val
+
+    @classmethod
+    def _parse_rule(cls) -> parser.SingleResultRule[Expr]:
+        return Val.parser_().convert_type(Literal)
 
 
 def tok(rule_name: str, val: Optional[str] = None) -> tokens.Token:
@@ -762,15 +779,15 @@ class RuleTest(TestCase):
                 self.assertEqual(lhs | rhs, expected)
 
     def test_call(self):
-        load_int: parser.SingleResultRule[Val] = Int.parse_rule()
-        load_str: parser.SingleResultRule[Val] = Str.parse_rule()
+        load_int: parser.SingleResultRule[Val] = Int._parse_rule()
+        load_str: parser.SingleResultRule[Val] = Str._parse_rule()
         parser_: parser.Parser[Val] = Val.parser_()
 
         for rule, state, scope, expected in list[tuple[
             parser.SingleResultRule[Val],
             tokens.TokenStream,
             parser.Scope[Val],
-            Optional[parser.StateAndResult[Val]],
+            Optional[parser.StateAndSingleResult[Val]],
         ]]([
             # literal
             (
@@ -1265,3 +1282,122 @@ class RuleTest(TestCase):
                         rule(state, scope)
                 else:
                     self.assertEqual(rule(state, scope), expected)
+
+    def test_convert_type(self):
+        for rule, state, expected in list[tuple[parser.SingleResultRule[Expr], tokens.TokenStream, Expr]]([
+            (
+                Expr.parser_(),
+                toks(tok('int', '1')),
+                Literal(Int(1)),
+            ),
+            (
+                Val.parser_().zero_or_one().convert_type(lambda val: Literal(val or Int(0))),
+                toks(),
+                Literal(Int(0)),
+            ),
+            (
+                Val.parser_().zero_or_one().convert_type(lambda val: Literal(val or Int(0))),
+                toks(tok('int', '1')),
+                Literal(Int(1)),
+            ),
+            (
+                Val.parser_().zero_or_more().convert_type(lambda vals: Literal(List(vals))),
+                toks(),
+                Literal(List([])),
+            ),
+            (
+                Val.parser_().zero_or_more().convert_type(lambda vals: Literal(List(vals))),
+                toks(
+                    tok('int', '1'),
+                    tok('int', '2'),
+                    tok('int', '3'),
+                ),
+                Literal(List([
+                    Int(1),
+                    Int(2),
+                    Int(3),
+                ])),
+            ),
+        ]):
+            with self.subTest(state=state, expected=expected):
+                state, expr = rule(state, parser.Scope[Expr]())
+                self.assertEqual(state, toks())
+                self.assertEqual(expr, expected)
+
+    def test_with_lexer(self):
+        lex_rule_a = lexer.Rule.load('a')
+        lexer_a = lexer.Lexer([lex_rule_a])
+        lex_rule_b = lexer.Rule.load('b')
+        lexer_b = lexer.Lexer([lex_rule_b])
+        for rule, lexer_, expected in list[tuple[
+            parser.Rule[Val],
+            lexer.Lexer,
+            lexer.Lexer,
+        ]]([
+            (
+                parser.LexRule(lex_rule_a),
+                lexer.Lexer(),
+                lexer_a,
+            ),
+            (
+                parser.LexRule(lex_rule_a),
+                lexer_b,
+                lexer_a | lexer_b,
+            ),
+            (
+                Val.ref(),
+                lexer.Lexer(),
+                lexer.Lexer(),
+            ),
+            (
+                Val.ref(),
+                lexer_a,
+                lexer_a,
+            ),
+            (
+                Val.ref().zero_or_one(),
+                lexer.Lexer(),
+                lexer.Lexer(),
+            ),
+            (
+                Val.ref().zero_or_one(),
+                lexer_a,
+                lexer_a,
+            ),
+            (
+                Val.ref().zero_or_more(),
+                lexer.Lexer(),
+                lexer.Lexer(),
+            ),
+            (
+                Val.ref().zero_or_more(),
+                lexer_a,
+                lexer_a,
+            ),
+            (
+                Int._parse_rule(),
+                lexer.Lexer(),
+                Int._parse_rule().lexer_,
+            ),
+            (
+                Int._parse_rule(),
+                lexer.Lexer([lex_rule_a]),
+                Int._parse_rule().lexer_ | lexer.Lexer([lex_rule_a]),
+            ),
+        ]):
+            with self.subTest(rule=rule, lexer_=lexer_, expected=expected):
+                self.assertEqual(
+                    rule.with_lexer(lexer_).lexer_,
+                    expected
+                )
+
+    def test_without_lexer(self):
+        for rule in list[parser.Rule[Val]]([
+            parser.LexRule[Val](lexer.Rule.load('a')),
+            Int.ref(),
+            Int._parse_rule(),
+            Int._parse_rule().zero_or_one(),
+            Int._parse_rule().zero_or_more(),
+        ]):
+            with self.subTest(rule=rule):
+                self.assertEqual(rule.without_lexer().lexer_, lexer.Lexer())

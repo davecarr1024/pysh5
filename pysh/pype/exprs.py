@@ -1,36 +1,20 @@
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from dataclasses import dataclass, field
-from typing import Iterable, Iterator, MutableSequence, Optional, Sequence, Sized, Type
-from . import builtins_, classes, lex_rules, vals
+from typing import Iterable, Iterator, MutableSequence, Sequence, Sized, Type
+from . import builtins_, vals
 from ..core import errors, lexer, parser, tokens
 
 
-class Expr(ABC):
+class Expr(parser.Parsable['Expr']):
     @abstractmethod
     def eval(self, scope: vals.Scope) -> vals.Val:
         ...
 
-    @staticmethod
-    def parser_() -> parser.Parser['Expr']:
-        return parser.Parser[Expr](
-            'expr',
-            parser.Scope[Expr]({
-                'expr': Expr.load,
-                'ref': Ref.load,
-            }),
-        )
-
     @classmethod
-    @abstractmethod
-    def load(cls, state: tokens.TokenStream, scope: parser.Scope['Expr']) -> parser.StateAndResult['Expr']:
-        return parser.Or[Expr]([
-            parser.Ref[Expr]('ref'),
-        ])(state, scope)
-
-    @classmethod
-    @abstractmethod
-    def lexer_(cls) -> lexer.Lexer:
-        return lex_rules.lexer_ | Ref.lexer_()
+    def types(cls) -> Sequence[Type['Expr']]:
+        return [
+            Ref,
+        ]
 
 
 @dataclass(frozen=True)
@@ -41,11 +25,8 @@ class Arg:
         return vals.Arg(self.val.eval(scope))
 
     @staticmethod
-    def loader(scope: parser.Scope[Expr]) -> parser.SingleResultRule['Arg']:
-        def inner(state: tokens.TokenStream, _: parser.Scope[Arg]) -> parser.StateAndResult[Arg]:
-            state, val = Expr.load(state, scope)
-            return state, Arg(val)
-        return inner
+    def parse_rule() -> parser.SingleResultRule['Arg']:
+        return Expr.parser_().convert_type(Arg).without_lexer()
 
 
 @dataclass(frozen=True)
@@ -62,34 +43,26 @@ class Args(Sized, Iterable[Arg]):
         return vals.Args([arg.eval(scope) for arg in self.args])
 
     @staticmethod
-    def loader(expr_scope: parser.Scope[Expr]) -> parser.SingleResultRule['Args']:
-        def inner(state: tokens.TokenStream, scope: parser.Scope[Args]) -> parser.StateAndResult[Args]:
-            def load_args(state: tokens.TokenStream, scope: parser.Scope[Args]) -> parser.StateAndResult[Args]:
-                load_arg = Arg.loader(expr_scope)
+    def parse_rule() -> parser.SingleResultRule['Args']:
+        return (
+            '(' &
+            (
+                Arg.parse_rule() &
+                (
+                    ',' &
+                    Arg.parse_rule()
+                ).zero_or_more()
+            ).convert_type(Args).zero_or_one().single_or(Args()) &
+            ')'
+        ).with_lexer(lexer.Lexer.whitespace())
 
-                def load_tail(state: tokens.TokenStream, scope: parser.Scope[Arg]) -> parser.StateAndResult[Arg]:
-                    state, _ = state.pop(',')
-                    return load_arg(state, scope)
 
-                state, head = load_arg(state, parser.Scope[Arg]())
-                state, tails = parser.ZeroOrMore[Arg](
-                    load_tail)(state, parser.Scope[Arg]())
-                return state, Args([head] + list(tails))
-
-            state, _ = state.pop('(')
-            state, args = parser.ZeroOrOne[Args](load_args)(state, scope)
-            state, _ = state.pop(')')
-            return state, args or Args()
-        return inner
-
-    @staticmethod
-    def lexer_() -> lexer.Lexer:
-        return lexer.Lexer([lex_rules.id, lex_rules.whitespace]) | lexer.Lexer.literals(['(', ',', ')'])
+_id_lex_rule = lexer.Rule.load('id', '(_|[a-z]|[A-Z])+')
 
 
 @dataclass(frozen=True)
 class Ref(Expr):
-    class Head(ABC):
+    class Head(parser.Parsable['Ref.Head']):
         @abstractmethod
         def eval(self, scope: vals.Scope) -> vals.Val:
             ...
@@ -98,14 +71,11 @@ class Ref(Expr):
             raise errors.Error(msg=f'unable to set ref head {self}')
 
         @classmethod
-        @abstractmethod
-        def load(cls, state: tokens.TokenStream, scope: parser.Scope['Ref.Head']) -> parser.StateAndResult['Ref.Head']:
-            return parser.Or[Ref.Head]([Ref.Name.load, Ref.Literal.load])(state, scope)
-
-        @classmethod
-        @abstractmethod
-        def lexer_(cls) -> lexer.Lexer:
-            return Ref.Name.lexer_() | Ref.Literal.lexer_()
+        def types(cls) -> Sequence[Type['Ref.Head']]:
+            return [
+                Ref.Name,
+                Ref.Literal,
+            ]
 
     @dataclass(frozen=True)
     class Name(Head):
@@ -118,12 +88,11 @@ class Ref(Expr):
             scope[self.name] = val
 
         @classmethod
-        def load(cls, state: tokens.TokenStream, scope: parser.Scope['Ref.Head']) -> parser.StateAndResult['Ref.Head']:
-            return parser.Literal[Ref.Head]('id', lambda token: Ref.Name(token.val))(state, scope)
-
-        @classmethod
-        def lexer_(cls) -> lexer.Lexer:
-            return lexer.Lexer([lex_rules.id])
+        def _parse_rule(cls) -> parser.SingleResultRule['Ref.Head']:
+            return parser.Literal(
+                _id_lex_rule,
+                lambda token: Ref.Name(token.val),
+            )
 
     @dataclass(frozen=True)
     class Literal(Head):
@@ -133,15 +102,10 @@ class Ref(Expr):
             return self.val
 
         @classmethod
-        def load(cls, state: tokens.TokenStream, scope: parser.Scope['Ref.Head']) -> parser.StateAndResult['Ref.Head']:
-            state, val = builtins_.Object.parser_()(state)
-            return state, Ref.Literal(val)
+        def _parse_rule(cls) -> parser.SingleResultRule['Ref.Head']:
+            return builtins_.Object.parser_().convert_type(Ref.Literal)
 
-        @classmethod
-        def lexer_(cls) -> lexer.Lexer:
-            return builtins_.Object.lexer()
-
-    class Tail(ABC):
+    class Tail(parser.Parsable['Ref.Tail']):
         @abstractmethod
         def eval(self, scope: vals.Scope, val: vals.Val) -> vals.Val:
             ...
@@ -150,14 +114,11 @@ class Ref(Expr):
             raise errors.Error(msg=f'unable to set ref tail {self}')
 
         @classmethod
-        @abstractmethod
-        def loader(cls, expr_scope: parser.Scope[Expr]) -> parser.SingleResultRule['Ref.Tail']:
-            return parser.Or[Ref.Tail]([Ref.Member.loader(expr_scope), Ref.Call.loader(expr_scope)])
-
-        @classmethod
-        @abstractmethod
-        def lexer_(cls) -> lexer.Lexer:
-            return Ref.Member.lexer_() | Ref.Call.lexer_()
+        def types(cls) -> Sequence[Type['Ref.Tail']]:
+            return [
+                Ref.Member,
+                Ref.Call,
+            ]
 
     @dataclass(frozen=True)
     class Member(Tail):
@@ -170,16 +131,8 @@ class Ref(Expr):
             obj[self.name] = val
 
         @classmethod
-        def loader(cls, expr_scope: parser.Scope[Expr]) -> parser.SingleResultRule['Ref.Tail']:
-            def load(state: tokens.TokenStream, scope: parser.Scope['Ref.Tail']) -> parser.StateAndResult['Ref.Tail']:
-                state, _ = state.pop('.')
-                state, name = parser.token_val(state, rule_name='id')
-                return state, Ref.Member(name)
-            return load
-
-        @classmethod
-        def lexer_(cls) -> lexer.Lexer:
-            return lexer.Lexer([lex_rules.id]) | lexer.Lexer.literals(['.'])
+        def _parse_rule(cls) -> parser.SingleResultRule['Ref.Tail']:
+            return '.' & parser.Literal[Ref.Tail](_id_lex_rule, lambda token: Ref.Member(token.val))
 
     @dataclass(frozen=True)
     class Call(Tail):
@@ -189,16 +142,8 @@ class Ref(Expr):
             return val(scope, self.args.eval(scope))
 
         @classmethod
-        def loader(cls, expr_scope: parser.Scope[Expr]) -> parser.SingleResultRule['Ref.Tail']:
-            def load(state: tokens.TokenStream, scope: parser.Scope['Ref.Tail']) -> parser.StateAndResult['Ref.Tail']:
-                state, args = Args.loader(expr_scope)(
-                    state, parser.Scope[Args]())
-                return state, Ref.Call(args)
-            return load
-
-        @classmethod
-        def lexer_(cls) -> lexer.Lexer:
-            return Args.lexer_()
+        def _parse_rule(cls) -> parser.SingleResultRule['Ref.Tail']:
+            return Args.parse_rule().convert_type(Ref.Call)
 
     head: Head
     tails: Sequence[Tail] = field(default_factory=list[Tail])
@@ -219,15 +164,18 @@ class Ref(Expr):
             self.tails[-1].set(scope, obj, val)
 
     @classmethod
-    def load(cls, state: tokens.TokenStream, scope: parser.Scope[Expr]) -> parser.StateAndResult[Expr]:
-        state, head = Ref.Head.load(state, parser.Scope[Ref.Head]())
-        state, tails = parser.ZeroOrMore[Ref.Tail](
-            Ref.Tail.loader(scope))(state, parser.Scope[Ref.Tail]())
-        return state, Ref(head, tails)
+    def _parse_rule(cls) -> parser.SingleResultRule[Expr]:
+        class Adapter(parser.SingleResultRule[Expr]):
+            def __call__(self, state: tokens.TokenStream, scope: parser.Scope[Expr]) -> parser.StateAndSingleResult[Expr]:
+                state, head = Ref.Head.parser_()(state)
+                state, tails = Ref.Tail.parser_().zero_or_more()(state, Ref.Tail.parser_().scope)
+                return state, Ref(head, tails)
 
-    @classmethod
-    def lexer_(cls) -> lexer.Lexer:
-        return Ref.Head.lexer_() | Ref.Tail.lexer_()
+            @property
+            def lexer_(self) -> lexer.Lexer:
+                return Ref.Head.parser_().lexer_ | Ref.Tail.parser_().lexer_
+
+        return Adapter()
 
 
 def ref(head_val: str | vals.Val, *tail_vals: str | Args) -> Ref:

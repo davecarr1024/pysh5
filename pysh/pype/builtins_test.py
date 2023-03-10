@@ -27,7 +27,7 @@ class IntTest(TestCase):
 
 class ObjectTest(TestCase):
     def test_load(self):
-        for state, expected in list[tuple[str, Optional[parser.StateAndResult[classes.Object]]]]([
+        for state, expected in list[tuple[str, Optional[parser.StateAndSingleResult[classes.Object]]]]([
             (
                 '1',
                 (

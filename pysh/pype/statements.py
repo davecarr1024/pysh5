@@ -1,11 +1,11 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Iterable, Iterator, MutableSequence, Optional, Sequence, Sized
+from typing import Iterable, Iterator, MutableSequence, Optional, Sequence, Sized, Type
 from . import exprs, lex_rules, vals
 from ..core import errors, lexer, parser, tokens
 
 
-class Statement(ABC):
+class Statement(parser.Parsable['Statement']):
     @dataclass(frozen=True)
     class Result:
         @dataclass(frozen=True)
@@ -38,42 +38,24 @@ class Statement(ABC):
     def eval(self, scope: vals.Scope) -> Result:
         ...
 
-    @staticmethod
-    def parser_() -> parser.Parser['Statement']:
-        def load_statements(state: tokens.TokenStream, scope: parser.Scope[Statement]) -> parser.StateAndResult[Statement]:
-            state, statements = parser.UntilEmpty[Statement](
-                parser.Ref[Statement]('statement'))(state, scope)
+    @classmethod
+    def types(cls) -> Sequence[Type['Statement']]:
+        return [
+            Block,
+            ExprStatement,
+            Assignment,
+            Return,
+        ]
+
+    @classmethod
+    @abstractmethod
+    def _parse_rule(cls) -> parser.SingleResultRule['Statement']:
+        def load(statements: Sequence[Statement]) -> Statement:
             if len(statements) == 1:
-                return state, statements[0]
+                return statements[0]
             else:
-                return state, Block(statements)
-
-        return parser.Parser[Statement](
-            'statements',
-            parser.Scope[Statement]({
-                'statements': load_statements,
-                'statement': Statement.load,
-                'block': Block.load,
-                'return': Return.load,
-                'assignment': Assignment.load,
-                'expr_statement': ExprStatement.load,
-            }),
-        )
-
-    @classmethod
-    @abstractmethod
-    def load(cls, state: tokens.TokenStream, scope: parser.Scope['Statement']) -> parser.StateAndResult['Statement']:
-        return parser.Or[Statement]([
-            parser.Ref[Statement]('block'),
-            parser.Ref[Statement]('return'),
-            parser.Ref[Statement]('assignment'),
-            parser.Ref[Statement]('expr_statement'),
-        ])(state, scope)
-
-    @classmethod
-    @abstractmethod
-    def lexer_(cls) -> lexer.Lexer:
-        return lex_rules.lexer_ | Block.lexer_() | Return.lexer_() | Assignment.lexer_() | ExprStatement.lexer_()
+                return Block(statements)
+        return parser.Or[Statement]([type.ref() for type in cls.types()]).until_empty().convert(load)
 
 
 @dataclass(frozen=True)
@@ -95,22 +77,8 @@ class Block(Statement, Sized, Iterable[Statement]):
         return Statement.Result()
 
     @classmethod
-    def load(cls, state: tokens.TokenStream, scope: parser.Scope[Statement]) -> parser.StateAndResult[Statement]:
-        state, _ = state.pop('{')
-        statements: MutableSequence[Statement] = []
-        while state.head().rule_name != '}':
-            try:
-                state, statement = parser.Ref[Statement](
-                    'statement')(state, scope)
-                statements.append(statement)
-            except errors.Error as error:
-                raise parser.StateError(state=state, children=[error])
-        state, _ = state.pop('}')
-        return state, Block(statements)
-
-    @classmethod
-    def lexer_(cls) -> lexer.Lexer:
-        return lexer.Lexer.literals(['{', '}'])
+    def _parse_rule(cls) -> parser.SingleResultRule[Statement]:
+        return ('{' & Statement.ref().zero_or_more() & '}').convert(Block).with_lexer(lexer.Lexer.whitespace())
 
 
 @dataclass(frozen=True)
@@ -122,37 +90,37 @@ class ExprStatement(Statement):
         return Statement.Result()
 
     @classmethod
-    def load(cls, state: tokens.TokenStream, scope: parser.Scope[Statement]) -> parser.StateAndResult[Statement]:
-        state, val = exprs.Expr.parser_()(state)
-        state, _ = state.pop(';')
-        return state, ExprStatement(val)
-
-    @classmethod
-    def lexer_(cls) -> lexer.Lexer:
-        return exprs.Expr.lexer_() | lexer.Lexer.literals([';'])
+    def _parse_rule(cls) -> parser.SingleResultRule[Statement]:
+        def load(val: exprs.Expr) -> Statement:
+            return ExprStatement(val)
+        return (exprs.Expr.parser_().convert_type(load) & ';').with_lexer(lexer.Lexer.whitespace())
 
 
 @dataclass(frozen=True)
 class Assignment(Statement):
-    ref: exprs.Ref
+    name: exprs.Ref
     val: exprs.Expr
 
     def eval(self, scope: vals.Scope) -> Statement.Result:
-        self.ref.set(scope, self.val.eval(scope))
+        self.name.set(scope, self.val.eval(scope))
         return Statement.Result()
 
     @classmethod
-    def load(cls, state: tokens.TokenStream, scope: parser.Scope[Statement]) -> parser.StateAndResult[Statement]:
-        state, ref = exprs.Expr.parser_()(state, rule_name='ref')
-        state, _ = state.pop('=')
-        state, val = exprs.Expr.parser_()(state)
-        state, _ = state.pop(';')
-        assert isinstance(ref, exprs.Ref)
-        return state, Assignment(ref, val)
+    def _parse_rule(cls) -> parser.SingleResultRule[Statement]:
+        class Adapter(parser.SingleResultRule[Statement]):
+            def __call__(self, state: tokens.TokenStream, scope: parser.Scope[Statement]) -> parser.StateAndSingleResult[Statement]:
+                state, name = exprs.Ref._parse_rule()(state, exprs.Expr.parser_().scope)
+                assert isinstance(name, exprs.Ref)
+                state, _ = state.pop('=')
+                state, val = exprs.Expr.parser_()(state)
+                state, _ = state.pop(';')
+                return state, Assignment(name, val)
 
-    @classmethod
-    def lexer_(cls) -> lexer.Lexer:
-        return exprs.Expr.lexer_() | lexer.Lexer.literals([';', '='])
+            @property
+            def lexer_(self) -> lexer.Lexer:
+                return lexer.Lexer.literal('=', ';') | exprs.Expr.parser_().lexer_ | lexer.Lexer.whitespace()
+
+        return Adapter()
 
 
 @dataclass(frozen=True)
@@ -163,13 +131,11 @@ class Return(Statement):
         return Statement.Result.for_return(self.val.eval(scope) if self.val else None)
 
     @classmethod
-    def load(cls, state: tokens.TokenStream, scope: parser.Scope[Statement]) -> parser.StateAndResult[Statement]:
-        state, _ = state.pop('return')
-        state, val = parser.ZeroOrOne[exprs.Expr](
-            exprs.Expr.parser_())(state, exprs.Expr.parser_().scope)
-        state, _ = state.pop(';')
-        return state, Return(val)
-
-    @classmethod
-    def lexer_(cls) -> lexer.Lexer:
-        return exprs.Expr.lexer_() | lexer.Lexer.literals([';', 'return'])
+    def _parse_rule(cls) -> parser.SingleResultRule[Statement]:
+        def load(val: Optional[exprs.Expr]) -> Statement:
+            return Return(val)
+        return (
+            'return' &
+            exprs.Expr.parser_().zero_or_one() &
+            ';'
+        ).convert_type(load).with_lexer(lexer.Lexer.whitespace())

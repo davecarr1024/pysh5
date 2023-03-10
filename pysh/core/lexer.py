@@ -119,3 +119,7 @@ class Lexer(Sized, Iterable[Rule]):
     @staticmethod
     def literal(*vals: str) -> 'Lexer':
         return Lexer([Rule.load(val) for val in vals])
+
+    @staticmethod
+    def whitespace() -> 'Lexer':
+        return Lexer([Rule.whitespace()])

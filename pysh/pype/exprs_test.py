@@ -6,7 +6,7 @@ from ..core import errors, parser, tokens
 
 class ExprTest(TestCase):
     def test_load(self):
-        for state, expected in list[tuple[tokens.TokenStream, Optional[parser.StateAndResult[exprs.Expr]]]]([
+        for state, expected in list[tuple[tokens.TokenStream, Optional[parser.StateAndSingleResult[exprs.Expr]]]]([
             (
                 tokens.TokenStream([
                 ]),
@@ -316,33 +316,21 @@ class ArgTest(TestCase):
                 else:
                     self.assertEqual(arg.eval(scope), expected)
 
+    def test_lexer(self):
+        assert 0, exprs.Arg.parse_rule().lexer_
+
     def test_load(self):
-        for state, expected in list[tuple[tokens.TokenStream, parser.StateAndResult[exprs.Arg]]]([
+        for state, expected in list[tuple[str, exprs.Arg]]([
             (
-                tokens.TokenStream([
-                    tokens.Token('int', '1'),
-                ]),
-                (
-                    tokens.TokenStream([]),
-                    exprs.Arg(exprs.ref(builtins_.int_(1))),
-                ),
-            ),
-            (
-                tokens.TokenStream([
-                    tokens.Token('int', '1'),
-                    tokens.Token('r', 'a'),
-                ]),
-                (
-                    tokens.TokenStream([
-                        tokens.Token('r', 'a'),
-                    ]),
-                    exprs.Arg(exprs.ref(builtins_.int_(1))),
-                ),
+                '1',
+                exprs.Arg(exprs.ref(builtins_.int_(1))),
             ),
         ]):
             with self.subTest(state=state, expected=expected):
-                self.assertEqual(exprs.Arg.loader(exprs.Expr.parser_().scope)(
-                    state, parser.Scope[exprs.Arg]()), expected)
+                state, expr = exprs.Arg.parse_rule()(
+                    state, parser.Scope[exprs.Arg]())
+                self.assertEqual(state, tokens.TokenStream())
+                self.assertEqual(expr, expected)
 
 
 class ArgsTest(TestCase):
@@ -380,131 +368,3 @@ class ArgsTest(TestCase):
                         args.eval(scope)
                 else:
                     self.assertEqual(args.eval(scope), expected)
-
-    def test_load(self):
-        for state, expected in list[tuple[tokens.TokenStream, Optional[parser.StateAndResult[exprs.Args]]]]([
-            (
-                tokens.TokenStream([
-                    tokens.Token('(', '('),
-                    tokens.Token(')', ')'),
-                ]),
-                (
-                    tokens.TokenStream([]),
-                    exprs.Args([]),
-                )
-            ),
-            (
-                tokens.TokenStream([
-                    tokens.Token('(', '('),
-                    tokens.Token('id', 'a'),
-                    tokens.Token(')', ')'),
-                ]),
-                (
-                    tokens.TokenStream([]),
-                    exprs.Args([
-                        exprs.Arg(exprs.ref('a')),
-                    ]),
-                )
-            ),
-            (
-                tokens.TokenStream([
-                    tokens.Token('(', '('),
-                    tokens.Token('id', 'a'),
-                    tokens.Token(',', ','),
-                    tokens.Token('id', 'b'),
-                    tokens.Token(')', ')'),
-                ]),
-                (
-                    tokens.TokenStream([]),
-                    exprs.Args([
-                        exprs.Arg(exprs.ref('a')),
-                        exprs.Arg(exprs.ref('b')),
-                    ]),
-                )
-            ),
-            (
-                tokens.TokenStream([
-                    tokens.Token('(', '('),
-                ]),
-                None,
-            ),
-            (
-                tokens.TokenStream([
-                    tokens.Token('(', '('),
-                    tokens.Token('id', 'a'),
-                ]),
-                None,
-            ),
-            (
-                tokens.TokenStream([
-                    tokens.Token('(', '('),
-                    tokens.Token('id', 'a'),
-                    tokens.Token(',', ','),
-                ]),
-                None,
-            ),
-            (
-                tokens.TokenStream([
-                    tokens.Token('(', '('),
-                    tokens.Token('id', 'a'),
-                    tokens.Token(',', ','),
-                    tokens.Token(')', ')'),
-                ]),
-                None,
-            ),
-        ]):
-            with self.subTest(state=state, expected=expected):
-                if expected is None:
-                    with self.assertRaises(errors.Error):
-                        exprs.Args.loader(exprs.Expr.parser_().scope)(
-                            state, parser.Scope[exprs.Args]())
-                else:
-                    self.assertEqual(
-                        exprs.Args.loader(exprs.Expr.parser_().scope)(
-                            state, parser.Scope[exprs.Args]()),
-                        expected
-                    )
-
-    def test_load_str(self):
-        for state, expected in list[tuple[str, parser.StateAndResult[exprs.Args]]]([
-            (
-                '()',
-                (
-                    tokens.TokenStream([]),
-                    exprs.Args(),
-                ),
-            ),
-            (
-                '(a)',
-                (
-                    tokens.TokenStream([]),
-                    exprs.Args([
-                        exprs.Arg(
-                            exprs.ref('a')
-                        ),
-                    ]),
-                ),
-            ),
-            (
-                '(a, b)',
-                (
-                    tokens.TokenStream([]),
-                    exprs.Args([
-                        exprs.Arg(
-                            exprs.ref('a')
-                        ),
-                        exprs.Arg(
-                            exprs.ref('b')
-                        ),
-                    ]),
-                ),
-            ),
-        ]):
-            with self.subTest(state=state, expected=expected):
-                self.assertEqual(
-                    exprs.Args.loader(
-                        exprs.Expr.parser_().scope
-                    )(
-                        exprs.Args.lexer_()(state),
-                        parser.Scope[exprs.Args](),
-                    ), expected)

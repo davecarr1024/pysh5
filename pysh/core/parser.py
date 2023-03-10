@@ -1,11 +1,12 @@
 from abc import ABC, abstractmethod
-from dataclasses import dataclass, field
-from typing import Callable, Generic, Iterable, Iterator, Mapping, MutableSequence, Optional, Sequence, Sized, Type,  TypeVar, Union, overload
+from dataclasses import dataclass, field, fields
+from typing import Any, Callable, Generic, Iterable, Iterator, Mapping, MutableSequence, Optional, Sequence, Sized, Type,  TypeVar, Union, overload
 from . import errors, lexer, tokens
 
 _Result = TypeVar('_Result')
+_ConvertResult = TypeVar('_ConvertResult')
 
-StateAndResult = tuple[tokens.TokenStream, _Result]
+StateAndSingleResult = tuple[tokens.TokenStream, _Result]
 StateAndMultipleResult = tuple[tokens.TokenStream, Sequence[_Result]]
 StateAndOptionalResult = tuple[tokens.TokenStream, Optional[_Result]]
 
@@ -48,6 +49,10 @@ class Scope(Generic[_Result]):
     rules: Mapping[str, 'SingleResultRule[_Result]'] = field(
         default_factory=dict[str, 'SingleResultRule[_Result]'])
 
+    def __post_init__(self):
+        for _, rule in self.rules.items():
+            assert rule is not None
+
     def __len__(self) -> int:
         return len(self.rules)
 
@@ -84,6 +89,33 @@ class Rule(Generic[_Result], ABC):
     @abstractmethod
     def multiple(self) -> 'MultipleResultRule[_Result]':
         ...
+
+    @abstractmethod
+    def with_lexer(self, lexer_: lexer.Lexer) -> 'Rule[_Result]':
+        ...
+
+    @abstractmethod
+    def without_lexer(self) -> 'Rule[_Result]':
+        ...
+
+
+_ChildRuleType = TypeVar('_ChildRuleType', bound=Rule)
+
+
+@dataclass(frozen=True)
+class _UnaryRule(Generic[_Result, _ChildRuleType], Rule[_Result]):
+    child: _ChildRuleType
+
+    def __str__(self) -> str:
+        return f"{self.__class__.__qualname__}({','.join([f'{f.name}={getattr(self,f.name)}' for f in fields(self)])})"
+
+    @property
+    def lexer_(self) -> lexer.Lexer:
+        return self.child.lexer_
+
+
+_AdapterResult = TypeVar('_AdapterResult')
+_AdapterConvertResult = TypeVar('_AdapterConvertResult')
 
 
 class NoResultRule(Rule[_Result]):
@@ -146,47 +178,43 @@ class NoResultRule(Rule[_Result]):
             msg=f'unable to convert NoResultRule {self} to SingleResultRule')
 
     def optional(self) -> 'OptionalResultRule[_Result]':
-        AdapterResult = TypeVar('AdapterResult')
-
-        @dataclass(frozen=True)
-        class Adapter(OptionalResultRule[AdapterResult]):
-            child: NoResultRule[AdapterResult]
-
-            def __str__(self) -> str:
-                return f'OptionalAdapter({self.child})'
-
-            def __call__(self, state: tokens.TokenStream, scope: Scope[AdapterResult]) -> StateAndOptionalResult[AdapterResult]:
+        class Adapter(_UnaryRule[_AdapterResult, NoResultRule[_AdapterResult]], OptionalResultRule[_AdapterResult]):
+            def __call__(self, state: tokens.TokenStream, scope: Scope[_AdapterResult]) -> StateAndOptionalResult[_AdapterResult]:
                 return self.child(state, scope), None
-
-            @property
-            def lexer_(self) -> lexer.Lexer:
-                return self.child.lexer_
-
         return Adapter[_Result](self)
 
     def multiple(self) -> 'MultipleResultRule[_Result]':
-        AdapterResult = TypeVar('AdapterResult')
-
-        @dataclass(frozen=True)
-        class Adapter(MultipleResultRule[AdapterResult]):
-            child: NoResultRule[AdapterResult]
-
-            def __str__(self) -> str:
-                return f'MultipleAdapter({self.child})'
-
-            def __call__(self, state: tokens.TokenStream, scope: Scope[AdapterResult]) -> StateAndMultipleResult[AdapterResult]:
+        class Adapter(_UnaryRule[_AdapterResult, NoResultRule[_AdapterResult]], MultipleResultRule[_AdapterResult]):
+            def __call__(self, state: tokens.TokenStream, scope: Scope[_AdapterResult]) -> StateAndMultipleResult[_AdapterResult]:
                 return self.child(state, scope), []
+        return Adapter[_Result](self)
+
+    def with_lexer(self, lexer_: lexer.Lexer) -> 'NoResultRule[_Result]':
+        class Adapter(_UnaryRule[_AdapterResult, NoResultRule[_AdapterResult]], NoResultRule[_AdapterResult]):
+            def __call__(self, state: tokens.TokenStream, scope: Scope[_AdapterResult]) -> tokens.TokenStream:
+                return self.child(state, scope)
 
             @property
             def lexer_(self) -> lexer.Lexer:
-                return self.child.lexer_
+                return super().lexer_ | lexer_
 
-        return Adapter[_Result](self)
+        return Adapter(self)
+
+    def without_lexer(self) -> 'NoResultRule[_Result]':
+        class Adapter(_UnaryRule[_AdapterResult, NoResultRule[_AdapterResult]], NoResultRule[_AdapterResult]):
+            def __call__(self, state: tokens.TokenStream, scope: Scope[_AdapterResult]) -> tokens.TokenStream:
+                return self.child(state, scope)
+
+            @property
+            def lexer_(self) -> lexer.Lexer:
+                return lexer.Lexer()
+
+        return Adapter(self)
 
 
 class SingleResultRule(Rule[_Result]):
     @abstractmethod
-    def __call__(self, state: tokens.TokenStream, scope: Scope[_Result]) -> StateAndResult[_Result]:
+    def __call__(self, state: tokens.TokenStream, scope: Scope[_Result]) -> StateAndSingleResult[_Result]:
         ...
 
     @overload
@@ -246,64 +274,66 @@ class SingleResultRule(Rule[_Result]):
         return self
 
     def optional(self) -> 'OptionalResultRule[_Result]':
-        AdapterResult = TypeVar('AdapterResult')
+        class Adapter(_UnaryRule[_AdapterResult, SingleResultRule[_AdapterResult]], OptionalResultRule[_AdapterResult]):
+            def __call__(self, state: tokens.TokenStream, scope: Scope[_AdapterResult]) -> StateAndOptionalResult[_AdapterResult]:
+                return self.child(state, scope)
+        return Adapter[_Result](self)
 
+    def multiple(self) -> 'MultipleResultRule[_Result]':
+        class Adapter(_UnaryRule[_AdapterResult, SingleResultRule[_AdapterResult]], MultipleResultRule[_AdapterResult]):
+            def __call__(self, state: tokens.TokenStream, scope: Scope[_AdapterResult]) -> StateAndMultipleResult[_AdapterResult]:
+                state, result = self.child(state, scope)
+                return state, [result]
+        return Adapter[_Result](self)
+
+    def convert(self, func: Callable[[_Result], _Result]) -> 'SingleResultRule[_Result]':
         @dataclass(frozen=True)
-        class Adapter(OptionalResultRule[AdapterResult]):
-            child: SingleResultRule[AdapterResult]
+        class Adapter(_UnaryRule[_AdapterResult, SingleResultRule[_AdapterResult]], SingleResultRule[_AdapterResult]):
+            func: Callable[[_AdapterResult], _AdapterResult]
 
-            def __str__(self) -> str:
-                return f'OptionalAdapter({self.child})'
+            def __call__(self, state: tokens.TokenStream, scope: Scope[_AdapterResult]) -> StateAndSingleResult[_AdapterResult]:
+                state, result = self.child(state, scope)
+                return state, self.func(result)
 
-            def __call__(self, state: tokens.TokenStream, scope: Scope[AdapterResult]) -> StateAndOptionalResult[AdapterResult]:
+        return Adapter[_Result](self, func)
+
+    def convert_type(self, func: Callable[[_Result], _ConvertResult]) -> 'SingleResultRule[_ConvertResult]':
+        @dataclass(frozen=True)
+        class Adapter(
+            Generic[_AdapterResult, _AdapterConvertResult],
+            _UnaryRule[_AdapterConvertResult,
+                       SingleResultRule[_AdapterResult]],
+            SingleResultRule[_AdapterConvertResult],
+        ):
+            func: Callable[[_AdapterResult], _AdapterConvertResult]
+
+            def __call__(self, state: tokens.TokenStream, scope: Scope[_AdapterConvertResult]) -> StateAndSingleResult[_AdapterConvertResult]:
+                state, result = self.child(state, Scope[_AdapterResult]())
+                return state, self.func(result)
+
+        return Adapter[_Result, _ConvertResult](self, func)
+
+    def with_lexer(self, lexer_: lexer.Lexer) -> 'SingleResultRule[_Result]':
+        class Adapter(_UnaryRule[_AdapterResult, SingleResultRule[_AdapterResult]], SingleResultRule[_AdapterResult]):
+            def __call__(self, state: tokens.TokenStream, scope: Scope[_AdapterResult]) -> StateAndSingleResult[_AdapterResult]:
                 return self.child(state, scope)
 
             @property
             def lexer_(self) -> lexer.Lexer:
-                return self.child.lexer_
+                return super().lexer_ | lexer_
 
-        return Adapter[_Result](self)
+        return Adapter(self)
 
-    def multiple(self) -> 'MultipleResultRule[_Result]':
-        AdapterResult = TypeVar('AdapterResult')
-
-        @dataclass(frozen=True)
-        class Adapter(MultipleResultRule[AdapterResult]):
-            child: SingleResultRule[AdapterResult]
-
-            def __str__(self) -> str:
-                return f'MultipleAdapter({self.child})'
-
-            def __call__(self, state: tokens.TokenStream, scope: Scope[AdapterResult]) -> StateAndMultipleResult[AdapterResult]:
-                state, result = self.child(state, scope)
-                return state, [result]
+    def without_lexer(self) -> 'SingleResultRule[_Result]':
+        class Adapter(_UnaryRule[_AdapterResult, SingleResultRule[_AdapterResult]], SingleResultRule[_AdapterResult]):
+            def __call__(self, state: tokens.TokenStream, scope: Scope[_AdapterResult]) -> StateAndSingleResult[_AdapterResult]:
+                return self.child(state, scope)
 
             @property
             def lexer_(self) -> lexer.Lexer:
-                return self.child.lexer_
+                return lexer.Lexer()
 
-        return Adapter[_Result](self)
-
-    def convert(self, func: Callable[[_Result], _Result]) -> 'SingleResultRule[_Result]':
-        AdapterResult = TypeVar('AdapterResult')
-
-        @dataclass(frozen=True)
-        class Adapter(SingleResultRule[AdapterResult]):
-            child: SingleResultRule[AdapterResult]
-            func: Callable[[AdapterResult], AdapterResult]
-
-            def __str__(self) -> str:
-                return f'SingleConverter(child={self.child},func={self.func})'
-
-            def __call__(self, state: tokens.TokenStream, scope: Scope[AdapterResult]) -> StateAndResult[AdapterResult]:
-                state, result = self.child(state, scope)
-                return state, self.func(result)
-
-            @property
-            def lexer_(self) -> lexer.Lexer:
-                return self.child.lexer_
-
-        return Adapter[_Result](self, func)
+        return Adapter(self)
 
     def zero_or_more(self) -> 'ZeroOrMore[_Result]':
         return ZeroOrMore[_Result](self)
@@ -374,50 +404,27 @@ class OptionalResultRule(Rule[_Result]):
         return OptionalResultAnd([LexRule.load(lhs), self])
 
     def single(self) -> SingleResultRule[_Result]:
-        AdapterResult = TypeVar('AdapterResult')
-
-        @dataclass(frozen=True)
-        class Adapter(SingleResultRule[AdapterResult]):
-            child: OptionalResultRule[AdapterResult]
-
-            def __str__(self) -> str:
-                return f'SingleOrAdapter({self.child})'
-
-            def __call__(self, state: tokens.TokenStream, scope: Scope[AdapterResult]) -> StateAndResult[AdapterResult]:
+        class Adapter(_UnaryRule[_AdapterResult, OptionalResultRule[_AdapterResult]], SingleResultRule[_AdapterResult]):
+            def __call__(self, state: tokens.TokenStream, scope: Scope[_AdapterResult]) -> StateAndSingleResult[_AdapterResult]:
                 state, result = self.child(state, scope)
                 if result is None:
                     raise RuleError(rule=self, state=state,
                                     msg=f'failed to get result from {self.child}')
                 else:
                     return state, result
-
-            @property
-            def lexer_(self) -> lexer.Lexer:
-                return self.child.lexer_
-
         return Adapter[_Result](self)
 
     def single_or(self, default: _Result) -> SingleResultRule[_Result]:
-        AdapterResult = TypeVar('AdapterResult')
-
         @dataclass(frozen=True)
-        class Adapter(SingleResultRule[AdapterResult]):
-            child: OptionalResultRule[AdapterResult]
-            default: AdapterResult
+        class Adapter(_UnaryRule[_AdapterResult, OptionalResultRule[_AdapterResult]], SingleResultRule[_AdapterResult]):
+            default: _AdapterResult
 
-            def __str__(self) -> str:
-                return f'SingleOrAdapter({self.child})'
-
-            def __call__(self, state: tokens.TokenStream, scope: Scope[AdapterResult]) -> StateAndResult[AdapterResult]:
+            def __call__(self, state: tokens.TokenStream, scope: Scope[_AdapterResult]) -> StateAndSingleResult[_AdapterResult]:
                 state, result = self.child(state, scope)
                 if result is None:
                     return state, self.default
                 else:
                     return state, result
-
-            @property
-            def lexer_(self) -> lexer.Lexer:
-                return self.child.lexer_
 
         return Adapter[_Result](self, default)
 
@@ -425,48 +432,63 @@ class OptionalResultRule(Rule[_Result]):
         return self
 
     def multiple(self) -> 'MultipleResultRule[_Result]':
-        AdapterResult = TypeVar('AdapterResult')
-
-        @dataclass(frozen=True)
-        class Adapter(MultipleResultRule[AdapterResult]):
-            child: OptionalResultRule[AdapterResult]
-
-            def __str__(self) -> str:
-                return f'MultipleAdapter({self.child})'
-
-            def __call__(self, state: tokens.TokenStream, scope: Scope[AdapterResult]) -> StateAndMultipleResult[AdapterResult]:
+        class Adapter(_UnaryRule[_AdapterResult, OptionalResultRule[_AdapterResult]], MultipleResultRule[_AdapterResult]):
+            def __call__(self, state: tokens.TokenStream, scope: Scope[_AdapterResult]) -> StateAndMultipleResult[_AdapterResult]:
                 state, result = self.child(state, scope)
                 if result is None:
                     return state, []
                 else:
                     return state, [result]
-
-            @property
-            def lexer_(self) -> lexer.Lexer:
-                return self.child.lexer_
-
         return Adapter[_Result](self)
 
     def convert(self, func: Callable[[Optional[_Result]], _Result]) -> 'SingleResultRule[_Result]':
-        AdapterResult = TypeVar('AdapterResult')
-
         @dataclass(frozen=True)
-        class Adapter(SingleResultRule[AdapterResult]):
-            child: OptionalResultRule[AdapterResult]
-            func: Callable[[Optional[AdapterResult]], AdapterResult]
+        class Adapter(_UnaryRule[_AdapterResult, OptionalResultRule[_AdapterResult]], SingleResultRule[_AdapterResult]):
+            func: Callable[[Optional[_AdapterResult]], _AdapterResult]
 
-            def __str__(self) -> str:
-                return f'OptionalConverter(child={self.child},func={self.func})'
-
-            def __call__(self, state: tokens.TokenStream, scope: Scope[AdapterResult]) -> StateAndResult[AdapterResult]:
+            def __call__(self, state: tokens.TokenStream, scope: Scope[_AdapterResult]) -> StateAndSingleResult[_AdapterResult]:
                 state, result = self.child(state, scope)
                 return state, self.func(result)
 
+        return Adapter[_Result](self, func)
+
+    def convert_type(self, func: Callable[[Optional[_Result]], _ConvertResult]) -> 'SingleResultRule[_ConvertResult]':
+        @dataclass(frozen=True)
+        class Adapter(
+            Generic[_AdapterResult, _AdapterConvertResult],
+            _UnaryRule[_AdapterConvertResult,
+                       OptionalResultRule[_AdapterResult]],
+            SingleResultRule[_AdapterConvertResult],
+        ):
+            func: Callable[[Optional[_AdapterResult]], _AdapterConvertResult]
+
+            def __call__(self, state: tokens.TokenStream, scope: Scope[_AdapterConvertResult]) -> StateAndSingleResult[_AdapterConvertResult]:
+                state, result = self.child(state, Scope[_AdapterResult]())
+                return state, self.func(result)
+
+        return Adapter[_Result, _ConvertResult](self, func)
+
+    def with_lexer(self, lexer_: lexer.Lexer) -> 'OptionalResultRule[_Result]':
+        class Adapter(_UnaryRule[_AdapterResult, OptionalResultRule[_AdapterResult]], OptionalResultRule[_AdapterResult]):
+            def __call__(self, state: tokens.TokenStream, scope: Scope[_AdapterResult]) -> StateAndOptionalResult[_AdapterResult]:
+                return self.child(state, scope)
+
             @property
             def lexer_(self) -> lexer.Lexer:
-                return self.child.lexer_
+                return super().lexer_ | lexer_
 
-        return Adapter[_Result](self, func)
+        return Adapter(self)
+
+    def without_lexer(self) -> 'OptionalResultRule[_Result]':
+        class Adapter(_UnaryRule[_AdapterResult, OptionalResultRule[_AdapterResult]], OptionalResultRule[_AdapterResult]):
+            def __call__(self, state: tokens.TokenStream, scope: Scope[_AdapterResult]) -> StateAndOptionalResult[_AdapterResult]:
+                return self.child(state, scope)
+
+            @property
+            def lexer_(self) -> lexer.Lexer:
+                return lexer.Lexer()
+
+        return Adapter(self)
 
 
 class MultipleResultRule(Rule[_Result]):
@@ -523,39 +545,18 @@ class MultipleResultRule(Rule[_Result]):
         return MultipleResultAnd([LexRule.load(lhs), self])
 
     def single(self) -> SingleResultRule[_Result]:
-        AdapterResult = TypeVar('AdapterResult')
-
-        @dataclass(frozen=True)
-        class Adapter(SingleResultRule[AdapterResult]):
-            child: MultipleResultRule[AdapterResult]
-
-            def __str__(self) -> str:
-                return f'SingleAdapter({self.child})'
-
-            def __call__(self, state: tokens.TokenStream, scope: Scope[AdapterResult]) -> StateAndResult[AdapterResult]:
+        class Adapter(_UnaryRule[_AdapterResult, MultipleResultRule[_AdapterResult]], SingleResultRule[_AdapterResult]):
+            def __call__(self, state: tokens.TokenStream, scope: Scope[_AdapterResult]) -> StateAndSingleResult[_AdapterResult]:
                 state, results = self.child(state, scope)
                 if len(results) != 1:
                     raise RuleError(
                         rule=self, state=state, msg=f'expected 1 result from {self.child} got {len(results)}')
                 return state, results[0]
-
-            @property
-            def lexer_(self) -> lexer.Lexer:
-                return self.child.lexer_
-
         return Adapter[_Result](self)
 
     def optional(self) -> OptionalResultRule[_Result]:
-        AdapterResult = TypeVar('AdapterResult')
-
-        @dataclass(frozen=True)
-        class Adapter(OptionalResultRule[AdapterResult]):
-            child: MultipleResultRule[AdapterResult]
-
-            def __str__(self) -> str:
-                return f'OptionalAdapter({self.child})'
-
-            def __call__(self, state: tokens.TokenStream, scope: Scope[AdapterResult]) -> StateAndOptionalResult[AdapterResult]:
+        class Adapter(_UnaryRule[_AdapterResult, MultipleResultRule[_AdapterResult]], OptionalResultRule[_AdapterResult]):
+            def __call__(self, state: tokens.TokenStream, scope: Scope[_AdapterResult]) -> StateAndOptionalResult[_AdapterResult]:
                 state, results = self.child(state, scope)
                 if len(results) == 0:
                     return state, None
@@ -564,36 +565,58 @@ class MultipleResultRule(Rule[_Result]):
                 else:
                     raise RuleError(
                         rule=self, state=state, msg=f'expected 0 or 1 results from {self.child} got {len(results)}')
-
-            @property
-            def lexer_(self) -> lexer.Lexer:
-                return self.child.lexer_
-
         return Adapter[_Result](self)
 
     def multiple(self) -> 'MultipleResultRule[_Result]':
         return self
 
     def convert(self, func: Callable[[Sequence[_Result]], _Result]) -> 'SingleResultRule[_Result]':
-        AdapterResult = TypeVar('AdapterResult')
-
         @dataclass(frozen=True)
-        class Adapter(SingleResultRule[AdapterResult]):
-            child: MultipleResultRule[AdapterResult]
-            func: Callable[[Sequence[AdapterResult]], AdapterResult]
+        class Adapter(_UnaryRule[_AdapterResult, MultipleResultRule[_AdapterResult]], SingleResultRule[_AdapterResult]):
+            func: Callable[[Sequence[_AdapterResult]], _AdapterResult]
 
-            def __str__(self) -> str:
-                return f'MultipleConverter(child={self.child},func={self.func})'
-
-            def __call__(self, state: tokens.TokenStream, scope: Scope[AdapterResult]) -> StateAndResult[AdapterResult]:
+            def __call__(self, state: tokens.TokenStream, scope: Scope[_AdapterResult]) -> StateAndSingleResult[_AdapterResult]:
                 state, result = self.child(state, scope)
                 return state, self.func(result)
 
+        return Adapter[_Result](self, func)
+
+    def convert_type(self, func: Callable[[Sequence[_Result]], _ConvertResult]) -> 'SingleResultRule[_ConvertResult]':
+        @dataclass(frozen=True)
+        class Adapter(
+            Generic[_AdapterResult, _AdapterConvertResult],
+            _UnaryRule[_AdapterConvertResult,
+                       MultipleResultRule[_AdapterResult]],
+            SingleResultRule[_AdapterConvertResult],
+        ):
+            func: Callable[[Sequence[_AdapterResult]], _AdapterConvertResult]
+
+            def __call__(self, state: tokens.TokenStream, scope: Scope[_AdapterConvertResult]) -> StateAndSingleResult[_AdapterConvertResult]:
+                state, results = self.child(state, Scope[_AdapterResult]())
+                return state, self.func(results)
+        return Adapter[_Result, _ConvertResult](self, func)
+
+    def with_lexer(self, lexer_: lexer.Lexer) -> 'MultipleResultRule[_Result]':
+        class Adapter(_UnaryRule[_AdapterResult, MultipleResultRule[_AdapterResult]], MultipleResultRule[_AdapterResult]):
+            def __call__(self, state: tokens.TokenStream, scope: Scope[_AdapterResult]) -> StateAndMultipleResult[_AdapterResult]:
+                return self.child(state, scope)
+
             @property
             def lexer_(self) -> lexer.Lexer:
-                return self.child.lexer_
+                return super().lexer_ | lexer_
 
-        return Adapter[_Result](self, func)
+        return Adapter(self)
+
+    def without_lexer(self) -> 'MultipleResultRule[_Result]':
+        class Adapter(_UnaryRule[_AdapterResult, MultipleResultRule[_AdapterResult]], MultipleResultRule[_AdapterResult]):
+            def __call__(self, state: tokens.TokenStream, scope: Scope[_AdapterResult]) -> StateAndMultipleResult[_AdapterResult]:
+                return self.child(state, scope)
+
+            @property
+            def lexer_(self) -> lexer.Lexer:
+                return lexer.Lexer()
+
+        return Adapter(self)
 
 
 @dataclass(frozen=True)
@@ -603,7 +626,7 @@ class Ref(SingleResultRule[_Result]):
     def __str__(self) -> str:
         return self.rule_name
 
-    def __call__(self, state: tokens.TokenStream, scope: Scope[_Result]) -> StateAndResult[_Result]:
+    def __call__(self, state: tokens.TokenStream, scope: Scope[_Result]) -> StateAndSingleResult[_Result]:
         if self.rule_name not in scope:
             raise RuleError(rule=self, state=state,
                             msg=f'unknown rule {self.rule_name}')
@@ -629,7 +652,7 @@ class AbstractLiteral(SingleResultRule[_Result]):
     def result(self, token: tokens.Token) -> _Result:
         ...
 
-    def __call__(self, state: tokens.TokenStream, scope: Scope[_Result]) -> StateAndResult[_Result]:
+    def __call__(self, state: tokens.TokenStream, scope: Scope[_Result]) -> StateAndSingleResult[_Result]:
         if state.head().rule_name != self.lex_rule.name:
             raise RuleError(
                 rule=self, state=state, msg=f'expected {self.lex_rule.name} got {state.head().rule_name}')
@@ -646,18 +669,6 @@ class Literal(AbstractLiteral[_Result]):
 
     def result(self, token: tokens.Token) -> _Result:
         return self.convert_result(token)
-
-
-_ChildRuleType = TypeVar('_ChildRuleType', bound=Rule)
-
-
-@dataclass(frozen=True)
-class _UnaryRule(Generic[_Result, _ChildRuleType], Rule[_Result]):
-    child: _ChildRuleType
-
-    @property
-    def lexer_(self) -> lexer.Lexer:
-        return self.child.lexer_
 
 
 @dataclass(frozen=True)
@@ -747,7 +758,7 @@ class Parser(Generic[_Result], SingleResultRule[_Result], Mapping[str, SingleRes
             state: tokens.TokenStream | str,
             scope: Optional[Scope[_Result]] = None,
             rule_name: Optional[str] = None,
-    ) -> StateAndResult[_Result]:
+    ) -> StateAndSingleResult[_Result]:
         if isinstance(state, str):
             state = self.lexer_(state)
         scope = (scope or Scope[_Result]()) | self.scope
@@ -1004,7 +1015,7 @@ class SingleResultAnd(_AbstractAnd[_Result, SingleResultRule[_Result] | NoResult
     def __rand__(self, lhs: str | lexer.Rule) -> 'SingleResultAnd[_Result]':
         return SingleResultAnd([LexRule[_Result].load(lhs)]+list(self))
 
-    def __call__(self, state: tokens.TokenStream, scope: Scope[_Result]) -> StateAndResult[_Result]:
+    def __call__(self, state: tokens.TokenStream, scope: Scope[_Result]) -> StateAndSingleResult[_Result]:
         result: Optional[_Result] = None
         for child in self:
             try:
@@ -1092,7 +1103,7 @@ class Or(_NaryRule[_Result, SingleResultRule[_Result]], SingleResultRule[_Result
     def __or__(self, rhs: SingleResultRule[_Result]) -> 'Or[_Result]':
         return Or[_Result](list(self.children)+[rhs])
 
-    def __call__(self, state: tokens.TokenStream, scope: Scope[_Result]) -> StateAndResult[_Result]:
+    def __call__(self, state: tokens.TokenStream, scope: Scope[_Result]) -> StateAndSingleResult[_Result]:
         child_errors: MutableSequence[errors.Error] = []
         for child in self.children:
             try:
@@ -1124,8 +1135,8 @@ class Parsable(ABC, Generic[_ParsableType]):
 
     @classmethod
     @abstractmethod
-    def parse_rule(cls) -> SingleResultRule[_ParsableType]:
-        ...
+    def _parse_rule(cls) -> SingleResultRule[_ParsableType]:
+        return Or[_ParsableType]([type.ref() for type in cls.types()])
 
     @classmethod
     @abstractmethod
@@ -1137,8 +1148,7 @@ class Parsable(ABC, Generic[_ParsableType]):
         return Parser[_ParsableType](
             cls._name(),
             Scope[_ParsableType](
-                {cls._name(): Or[_ParsableType]([type.ref() for type in cls.types()])} |
-                {type._name(): type.parse_rule()
-                 for type in cls.types()}
+                {cls._name(): cls._parse_rule()} |
+                {type._name(): type._parse_rule() for type in cls.types()}
             )
         )
