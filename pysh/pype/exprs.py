@@ -63,7 +63,7 @@ class Args(Sized, Iterable[Arg]):
         ).with_lexer(lexer.Lexer.whitespace())
 
 
-_id_lex_rule = lexer.Rule.load('id', '(_|[a-z]|[A-Z])+')
+id_lex_rule = lexer.Rule.load('id', '(_|[a-z]|[A-Z])+')
 
 
 @dataclass(frozen=True)
@@ -99,7 +99,7 @@ class Ref(Expr):
         @classmethod
         def _parse_rule(cls) -> parser.SingleResultRule['Ref.Head']:
             return parser.Literal(
-                _id_lex_rule,
+                id_lex_rule,
                 lambda token: Ref.Name(token.val),
             )
 
@@ -147,7 +147,7 @@ class Ref(Expr):
 
         @classmethod
         def _parse_rule(cls, expr_scope: parser.Scope[Expr]) -> parser.SingleResultRule['Ref.Tail']:
-            return '.' & parser.Literal[Ref.Tail](_id_lex_rule, lambda token: Ref.Member(token.val))
+            return '.' & parser.Literal[Ref.Tail](id_lex_rule, lambda token: Ref.Member(token.val))
 
     @dataclass(frozen=True)
     class Call(Tail):

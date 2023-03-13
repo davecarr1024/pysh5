@@ -1,17 +1,21 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Iterable, Iterator, Sequence, Sized
-from ..core import errors
-from . import vals
+from ..core import errors, lexer, parser
+from . import exprs, vals
 
 
 @dataclass(frozen=True)
 class Param:
     name: str
 
+    @staticmethod
+    def parse_rule() -> parser.SingleResultRule['Param']:
+        return parser.Literal(exprs.id_lex_rule, lambda token: Param(token.val))
+
 
 @dataclass(frozen=True)
 class Params(Sized, Iterable[Param]):
-    params: Sequence[Param]
+    params: Sequence[Param] = field(default_factory=list[Param])
 
     def __len__(self) -> int:
         return len(self.params)
@@ -30,3 +34,17 @@ class Params(Sized, Iterable[Param]):
         if not self:
             raise errors.Error(msg='tail from empty params')
         return Params(self.params[1:])
+
+    @staticmethod
+    def parse_rule() -> parser.SingleResultRule['Params']:
+        return (
+            '(' &
+            (
+                Param.parse_rule() &
+                (
+                    ',' &
+                    Param.parse_rule()
+                ).zero_or_more()
+            ).convert_type(Params).zero_or_one().single_or(Params())
+            & ')'
+        ).with_lexer(lexer.Lexer.whitespace())

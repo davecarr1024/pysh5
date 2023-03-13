@@ -1,6 +1,21 @@
+from typing import Optional
 from unittest import TestCase
-from ..core import errors
+from ..core import errors, tokens
 from . import builtins_, params, vals
+
+
+class ParamTest(TestCase):
+    def test_load(self):
+        for input, expected in list[tuple[str, params.Param]]([
+            (
+                'a',
+                params.Param('a'),
+            ),
+        ]):
+            with self.subTest(input=input, expected=expected):
+                state, actual = params.Param.parse_rule().apply(input)
+                self.assertEqual(state, tokens.TokenStream())
+                self.assertEqual(actual, expected)
 
 
 class ParamsTest(TestCase):
@@ -73,3 +88,48 @@ class ParamsTest(TestCase):
         ]):
             with self.subTest(params_=params_, expected=expected):
                 self.assertEqual(params_.tail, expected)
+
+    def test_load(self):
+        for input, expected in list[tuple[str, Optional[params.Params]]]([
+            (
+                '',
+                None,
+            ),
+            (
+                '(',
+                None,
+            ),
+            (
+                '(a',
+                None,
+            ),
+            (
+                '(a,',
+                None,
+            ),
+            (
+                '()',
+                params.Params(),
+            ),
+            (
+                '(a)',
+                params.Params([
+                    params.Param('a'),
+                ]),
+            ),
+            (
+                '(a, b)',
+                params.Params([
+                    params.Param('a'),
+                    params.Param('b'),
+                ]),
+            ),
+        ]):
+            with self.subTest(input=input, expected=expected):
+                if expected is None:
+                    with self.assertRaises(errors.Error):
+                        params.Params.parse_rule().apply(input)
+                else:
+                    state, actual = params.Params.parse_rule().apply(input)
+                    self.assertEqual(state, tokens.TokenStream())
+                    self.assertEqual(actual, expected)
