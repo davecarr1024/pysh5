@@ -21,17 +21,23 @@ class Expr(parser.Parsable['Expr']):
 class Arg:
     val: Expr
 
+    def __str__(self) -> str:
+        return str(self.val)
+
     def eval(self, scope: vals.Scope) -> vals.Arg:
         return vals.Arg(self.val.eval(scope))
 
     @staticmethod
-    def parse_rule() -> parser.SingleResultRule['Arg']:
-        return Expr.parser_().convert_type(Arg).without_lexer()
+    def parse_rule(expr_scope: parser.Scope[Expr]) -> parser.SingleResultRule['Arg']:
+        return Expr.ref().with_scope(expr_scope).convert_type(Arg)
 
 
 @dataclass(frozen=True)
 class Args(Sized, Iterable[Arg]):
     args: Sequence[Arg] = field(default_factory=list[Arg])
+
+    def __str__(self) -> str:
+        return f"({', '.join(map(str,self))})"
 
     def __len__(self) -> int:
         return len(self.args)
@@ -43,14 +49,14 @@ class Args(Sized, Iterable[Arg]):
         return vals.Args([arg.eval(scope) for arg in self.args])
 
     @staticmethod
-    def parse_rule() -> parser.SingleResultRule['Args']:
+    def parse_rule(expr_scope: parser.Scope[Expr]) -> parser.SingleResultRule['Args']:
         return (
             '(' &
             (
-                Arg.parse_rule() &
+                Arg.parse_rule(expr_scope) &
                 (
                     ',' &
-                    Arg.parse_rule()
+                    Arg.parse_rule(expr_scope)
                 ).zero_or_more()
             ).convert_type(Args).zero_or_one().single_or(Args()) &
             ')'
@@ -81,6 +87,9 @@ class Ref(Expr):
     class Name(Head):
         name: str
 
+        def __str__(self) -> str:
+            return self.name
+
         def eval(self, scope: vals.Scope) -> vals.Val:
             return scope[self.name]
 
@@ -98,6 +107,9 @@ class Ref(Expr):
     class Literal(Head):
         val: vals.Val
 
+        def __str__(self) -> str:
+            return str(self.val)
+
         def eval(self, scope: vals.Scope) -> vals.Val:
             return self.val
 
@@ -105,7 +117,7 @@ class Ref(Expr):
         def _parse_rule(cls) -> parser.SingleResultRule['Ref.Head']:
             return builtins_.Object.parser_().convert_type(Ref.Literal)
 
-    class Tail(parser.Parsable['Ref.Tail']):
+    class Tail(parser.ParsableWithContext['Ref.Tail', parser.Scope[Expr]]):
         @abstractmethod
         def eval(self, scope: vals.Scope, val: vals.Val) -> vals.Val:
             ...
@@ -124,6 +136,9 @@ class Ref(Expr):
     class Member(Tail):
         name: str
 
+        def __str__(self) -> str:
+            return self.name
+
         def eval(self, scope: vals.Scope, val: vals.Val) -> vals.Val:
             return val[self.name]
 
@@ -131,22 +146,28 @@ class Ref(Expr):
             obj[self.name] = val
 
         @classmethod
-        def _parse_rule(cls) -> parser.SingleResultRule['Ref.Tail']:
+        def _parse_rule(cls, expr_scope: parser.Scope[Expr]) -> parser.SingleResultRule['Ref.Tail']:
             return '.' & parser.Literal[Ref.Tail](_id_lex_rule, lambda token: Ref.Member(token.val))
 
     @dataclass(frozen=True)
     class Call(Tail):
         args: Args
 
+        def __str__(self) -> str:
+            return str(self.args)
+
         def eval(self, scope: vals.Scope, val: vals.Val) -> vals.Val:
             return val(scope, self.args.eval(scope))
 
         @classmethod
-        def _parse_rule(cls) -> parser.SingleResultRule['Ref.Tail']:
-            return Args.parse_rule().convert_type(Ref.Call)
+        def _parse_rule(cls, expr_scope: parser.Scope[Expr]) -> parser.SingleResultRule['Ref.Tail']:
+            return Args.parse_rule(expr_scope).convert_type(Ref.Call)
 
     head: Head
     tails: Sequence[Tail] = field(default_factory=list[Tail])
+
+    def __str__(self) -> str:
+        return f"{self.head}{''.join(map(str,self.tails))}"
 
     def eval(self, scope: vals.Scope) -> vals.Val:
         val = self.head.eval(scope)
@@ -168,12 +189,13 @@ class Ref(Expr):
         class Adapter(parser.SingleResultRule[Expr]):
             def __call__(self, state: tokens.TokenStream, scope: parser.Scope[Expr]) -> parser.StateAndSingleResult[Expr]:
                 state, head = Ref.Head.parser_()(state)
-                state, tails = Ref.Tail.parser_().zero_or_more()(state, Ref.Tail.parser_().scope)
+                state, tails = Ref.Tail.parser_(scope).zero_or_more()(
+                    state, Ref.Tail.parser_(scope).scope)
                 return state, Ref(head, tails)
 
             @property
             def lexer_(self) -> lexer.Lexer:
-                return Ref.Head.parser_().lexer_ | Ref.Tail.parser_().lexer_
+                return Ref.Head.parser_().lexer_ | Ref.Tail.parser_(parser.Scope()).lexer_
 
         return Adapter()
 

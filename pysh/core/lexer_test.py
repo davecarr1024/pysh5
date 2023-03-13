@@ -93,7 +93,7 @@ class LexerTest(TestCase):
                 self.assertEqual(lexer.Lexer.literal(*vals), expected)
 
     def test_or(self):
-        for lhs, rhs, expected in list[tuple[lexer.Lexer, lexer.Lexer, Optional[lexer.Lexer]]]([
+        for lhs, rhs, expected in list[tuple[lexer.Lexer, lexer.Lexer, lexer.Lexer]]([
             (
                 lexer.Lexer([]),
                 lexer.Lexer([]),
@@ -136,7 +136,9 @@ class LexerTest(TestCase):
                 lexer.Lexer([
                     lexer.Rule.load('r', 'b'),
                 ]),
-                None,
+                lexer.Lexer([
+                    lexer.Rule.load('r', 'b'),
+                ]),
             ),
             (
                 lexer.Lexer([
@@ -179,8 +181,4 @@ class LexerTest(TestCase):
             ),
         ]):
             with self.subTest(lhs=lhs, rhs=rhs, expected=expected):
-                if expected is None:
-                    with self.assertRaises(errors.Error):
-                        _ = lhs | rhs
-                else:
-                    self.assertEqual(lhs | rhs, expected)
+                self.assertEqual(lhs | rhs, expected)

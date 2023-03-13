@@ -8,11 +8,23 @@ class PypeTest(TestCase):
     def test_eval(self):
         for input, expected in list[tuple[str, Optional[vals.Val]]]([
             (
+                '',
+                builtins_.none,
+            ),
+            (
+                '{}',
+                builtins_.none,
+            ),
+            (
                 '1;',
                 builtins_.int_(1),
             ),
             (
                 'a = 1; a;',
+                builtins_.int_(1),
+            ),
+            (
+                '{1;}',
                 builtins_.int_(1),
             ),
             (

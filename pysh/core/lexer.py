@@ -83,15 +83,7 @@ class Lexer(Sized, Iterable[Rule]):
     def __or__(self, rhs: 'Lexer | Rule') -> 'Lexer':
         if isinstance(rhs, Rule):
             rhs = Lexer([rhs])
-        lhs_rules = self._rules_dict()
-        rhs_rules = rhs._rules_dict()
-        for rule_name in set(lhs_rules.keys()) & set(rhs_rules.keys()):
-            lhs_rule = lhs_rules[rule_name]
-            rhs_rule = rhs_rules[rule_name]
-            if lhs_rule != rhs_rule:
-                raise errors.Error(
-                    msg=f'redefining lex rule {rule_name}: {lhs_rule} != {rhs_rule}')
-        return Lexer.load(**(lhs_rules | rhs_rules))
+        return Lexer.load(**(self._rules_dict() | rhs._rules_dict()))
 
     def _apply_any(self, state: chars.CharStream) -> StateAndResult:
         errors_: MutableSequence[errors.Error] = []

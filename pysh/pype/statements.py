@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from typing import Iterable, Iterator, MutableSequence, Optional, Sequence, Sized, Type
-from . import exprs, lex_rules, vals
+from . import exprs,  vals
 from ..core import errors, lexer, parser, tokens
 
 
@@ -41,21 +41,11 @@ class Statement(parser.Parsable['Statement']):
     @classmethod
     def types(cls) -> Sequence[Type['Statement']]:
         return [
+            Return,
             Block,
             ExprStatement,
             Assignment,
-            Return,
         ]
-
-    @classmethod
-    @abstractmethod
-    def _parse_rule(cls) -> parser.SingleResultRule['Statement']:
-        def load(statements: Sequence[Statement]) -> Statement:
-            if len(statements) == 1:
-                return statements[0]
-            else:
-                return Block(statements)
-        return parser.Or[Statement]([type.ref() for type in cls.types()]).until_empty().convert(load)
 
 
 @dataclass(frozen=True)
@@ -78,7 +68,12 @@ class Block(Statement, Sized, Iterable[Statement]):
 
     @classmethod
     def _parse_rule(cls) -> parser.SingleResultRule[Statement]:
-        return ('{' & Statement.ref().zero_or_more() & '}').convert(Block).with_lexer(lexer.Lexer.whitespace())
+        close_brace_lex_rule = lexer.Rule.load('}')
+        return (
+            '{' &
+            Statement.ref().until_token(close_brace_lex_rule) &
+            close_brace_lex_rule
+        ).convert(Block).with_lexer(lexer.Lexer.whitespace())
 
 
 @dataclass(frozen=True)

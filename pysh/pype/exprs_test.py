@@ -1,183 +1,82 @@
 from typing import Any, Optional
 from unittest import TestCase
 from . import builtins_, classes, exprs, vals
-from ..core import errors, parser, tokens
+from ..core import errors,  tokens
+
+if 'unittest.util' in __import__('sys').modules:
+    # Show full diff in self.assertEqual.
+    __import__('sys').modules['unittest.util']._MAX_LENGTH = 999999999
+
+_ref = exprs.ref
+_int = builtins_.int_
+
+
+def _arg(val: vals.Val | str | exprs.Expr) -> exprs.Arg:
+    if isinstance(val, vals.Val):
+        return exprs.Arg(_ref(val))
+    elif isinstance(val, str):
+        return exprs.Arg(_ref(val))
+    else:
+        return exprs.Arg(val)
+
+
+def _args(*vals: vals.Val | str | exprs.Expr) -> exprs.Args:
+    return exprs.Args([_arg(val) for val in vals])
 
 
 class ExprTest(TestCase):
     def test_load(self):
-        for state, expected in list[tuple[tokens.TokenStream, Optional[parser.StateAndSingleResult[exprs.Expr]]]]([
+        for input, expected in list[tuple[str, Optional[exprs.Expr]]]([
             (
-                tokens.TokenStream([
-                ]),
-                None,
+                '1',
+                _ref(_int(1)),
             ),
             (
-                tokens.TokenStream([
-                    tokens.Token('r', 'a'),
-                ]),
-                None,
+                'a',
+                _ref('a'),
             ),
             (
-                tokens.TokenStream([
-                    tokens.Token('int', '1'),
-                ]),
-                (
-                    tokens.TokenStream([]),
-                    exprs.ref(builtins_.int_(1)),
-                ),
+                'a.b',
+                _ref('a', 'b'),
             ),
             (
-                tokens.TokenStream([
-                    tokens.Token('id', 'a'),
-                ]),
-                (
-                    tokens.TokenStream([]),
-                    exprs.ref('a'),
-                ),
+                'a()',
+                _ref('a', _args()),
             ),
             (
-                tokens.TokenStream([
-                    tokens.Token('int', '1'),
-                    tokens.Token('.', '.'),
-                    tokens.Token('id', 'b'),
-                ]),
-                (
-                    tokens.TokenStream([]),
-                    exprs.ref(builtins_.int_(1), 'b'),
-                ),
+                'a(b)',
+                _ref('a', _args('b')),
             ),
             (
-                tokens.TokenStream([
-                    tokens.Token('id', 'a'),
-                    tokens.Token('.', '.'),
-                    tokens.Token('id', 'b'),
-                ]),
-                (
-                    tokens.TokenStream([]),
-                    exprs.ref('a', 'b'),
-                ),
+                'a(1)',
+                _ref('a', _args(_int(1))),
             ),
             (
-                tokens.TokenStream([
-                    tokens.Token('int', '1'),
-                    tokens.Token('(', '('),
-                    tokens.Token(')', ')'),
-                ]),
-                (
-                    tokens.TokenStream([]),
-                    exprs.ref(builtins_.int_(1), exprs.Args()),
-                ),
+                '1(a)',
+                _ref(_int(1), _args('a')),
             ),
             (
-                tokens.TokenStream([
-                    tokens.Token('id', 'a'),
-                    tokens.Token('(', '('),
-                    tokens.Token(')', ')'),
-                ]),
-                (
-                    tokens.TokenStream([]),
-                    exprs.ref('a', exprs.Args()),
-                ),
+                'a(b, c)',
+                _ref('a', _args('b', 'c')),
             ),
             (
-                tokens.TokenStream([
-                    tokens.Token('int', '1'),
-                    tokens.Token('(', '('),
-                    tokens.Token(')', ')'),
-                    tokens.Token('.', '.'),
-                    tokens.Token('id', 'b'),
-                ]),
-                (
-                    tokens.TokenStream([]),
-                    exprs.ref(builtins_.int_(1), exprs.Args(), 'b'),
-                ),
+                'a.b(c, d)',
+                _ref('a', 'b', _args('c', 'd')),
             ),
             (
-                tokens.TokenStream([
-                    tokens.Token('id', 'a'),
-                    tokens.Token('(', '('),
-                    tokens.Token(')', ')'),
-                    tokens.Token('.', '.'),
-                    tokens.Token('id', 'b'),
-                ]),
-                (
-                    tokens.TokenStream([]),
-                    exprs.ref('a', exprs.Args(), 'b'),
-                ),
-            ),
-            (
-                tokens.TokenStream([
-                    tokens.Token('int', '1'),
-                    tokens.Token('(', '('),
-                    tokens.Token('id', 'b'),
-                    tokens.Token(')', ')'),
-                ]),
-                (
-                    tokens.TokenStream([]),
-                    exprs.ref(builtins_.int_(1), exprs.Args(
-                        [exprs.Arg(exprs.ref('b'))])),
-                ),
-            ),
-            (
-                tokens.TokenStream([
-                    tokens.Token('id', 'a'),
-                    tokens.Token('(', '('),
-                    tokens.Token('id', 'b'),
-                    tokens.Token(')', ')'),
-                ]),
-                (
-                    tokens.TokenStream([]),
-                    exprs.ref('a', exprs.Args([exprs.Arg(exprs.ref('b'))])),
-                ),
-            ),
-            (
-                tokens.TokenStream([
-                    tokens.Token('int', '1'),
-                    tokens.Token('(', '('),
-                    tokens.Token('id', 'b'),
-                    tokens.Token(',', ','),
-                    tokens.Token('id', 'c'),
-                    tokens.Token(')', ')'),
-                ]),
-                (
-                    tokens.TokenStream([]),
-                    exprs.ref(
-                        builtins_.int_(1),
-                        exprs.Args([
-                            exprs.Arg(exprs.ref('b')),
-                            exprs.Arg(exprs.ref('c')),
-                        ])
-                    ),
-                ),
-            ),
-            (
-                tokens.TokenStream([
-                    tokens.Token('id', 'a'),
-                    tokens.Token('(', '('),
-                    tokens.Token('id', 'b'),
-                    tokens.Token(',', ','),
-                    tokens.Token('id', 'c'),
-                    tokens.Token(')', ')'),
-                ]),
-                (
-                    tokens.TokenStream([]),
-                    exprs.ref(
-                        'a',
-                        exprs.Args([
-                            exprs.Arg(exprs.ref('b')),
-                            exprs.Arg(exprs.ref('c')),
-                        ])
-                    ),
-                ),
+                'a(b, c).d',
+                _ref('a', _args('b', 'c'), 'd'),
             ),
         ]):
-            with self.subTest(state=state, expected=expected):
+            with self.subTest(input=input, expected=expected):
                 if expected is None:
                     with self.assertRaises(errors.Error):
-                        exprs.Expr.parser_()(state)
+                        exprs.Expr.parser_()(input)
                 else:
-                    self.assertEqual(exprs.Expr.parser_()(state), expected)
+                    state, actual = exprs.Expr.parser_()(input)
+                    self.assertEqual(state, tokens.TokenStream())
+                    self.assertEqual(actual, expected,
+                                     f'{actual} != {expected}')
 
 
 class RefTest(TestCase):
@@ -316,19 +215,20 @@ class ArgTest(TestCase):
                 else:
                     self.assertEqual(arg.eval(scope), expected)
 
-    def test_lexer(self):
-        assert 0, exprs.Arg.parse_rule().lexer_
-
     def test_load(self):
-        for state, expected in list[tuple[str, exprs.Arg]]([
+        for input, expected in list[tuple[str, exprs.Arg]]([
             (
                 '1',
                 exprs.Arg(exprs.ref(builtins_.int_(1))),
             ),
+            (
+                'a',
+                exprs.Arg(exprs.ref('a')),
+            ),
         ]):
-            with self.subTest(state=state, expected=expected):
-                state, expr = exprs.Arg.parse_rule()(
-                    state, parser.Scope[exprs.Arg]())
+            with self.subTest(input=input, expected=expected):
+                state, expr = exprs.Arg.parse_rule(
+                    exprs.Expr.parser_().scope).apply(input)
                 self.assertEqual(state, tokens.TokenStream())
                 self.assertEqual(expr, expected)
 
@@ -368,3 +268,115 @@ class ArgsTest(TestCase):
                         args.eval(scope)
                 else:
                     self.assertEqual(args.eval(scope), expected)
+
+    def test_eq(self):
+        for lhs, rhs in list[tuple[exprs.Args, exprs.Args]]([
+            (
+                exprs.Args([]),
+                exprs.Args([]),
+            ),
+            (
+                exprs.Args([
+                    exprs.Arg(exprs.ref('a')),
+                ]),
+                exprs.Args([
+                    exprs.Arg(exprs.ref('a')),
+                ]),
+            ),
+        ]):
+            with self.subTest(lhs=lhs, rhs=rhs):
+                self.assertEqual(lhs, rhs)
+
+    def test_neq(self):
+        for lhs, rhs in list[tuple[exprs.Args, exprs.Args]]([
+            (
+                exprs.Args([]),
+                exprs.Args([
+                    exprs.Arg(exprs.ref('a')),
+                ]),
+            ),
+            (
+                exprs.Args([
+                    exprs.Arg(exprs.ref('a')),
+                ]),
+                exprs.Args([]),
+            ),
+            (
+                exprs.Args([
+                    exprs.Arg(exprs.ref('a')),
+                ]),
+                exprs.Args([
+                    exprs.Arg(exprs.ref('b')),
+                ]),
+            ),
+        ]):
+            with self.subTest(lhs=lhs, rhs=rhs):
+                self.assertNotEqual(lhs, rhs)
+
+    def test_load(self):
+        for input, expected in list[tuple[str, Optional[exprs.Args]]]([
+            (
+                '()',
+                exprs.Args(),
+            ),
+            (
+                '(a)',
+                exprs.Args([
+                    exprs.Arg(
+                        exprs.ref('a')
+                    ),
+                ]),
+            ),
+            (
+                '(a, b)',
+                exprs.Args([
+                    exprs.Arg(
+                        exprs.ref('a')
+                    ),
+                    exprs.Arg(
+                        exprs.ref('b')
+                    ),
+                ]),
+            ),
+            (
+                '(a, b, c)',
+                exprs.Args([
+                    exprs.Arg(
+                        exprs.ref('a')
+                    ),
+                    exprs.Arg(
+                        exprs.ref('b')
+                    ),
+                    exprs.Arg(
+                        exprs.ref('c')
+                    ),
+                ]),
+            ),
+            (
+                '(',
+                None,
+            ),
+            (
+                '(a',
+                None,
+            ),
+            (
+                '(a,',
+                None,
+            ),
+            (
+                '(a,)',
+                None,
+            ),
+        ]):
+            with self.subTest(input=input, expected=expected):
+                if expected is None:
+                    with self.assertRaises(errors.Error):
+                        exprs.Args.parse_rule(
+                            exprs.Expr.parser_().scope).apply(input)
+                else:
+                    state, actual = exprs.Args.parse_rule(
+                        exprs.Expr.parser_().scope).apply(input)
+                    self.assertEqual(state, tokens.TokenStream())
+                    self.assertEqual(actual, expected,
+                                     f'{actual} != {expected}')

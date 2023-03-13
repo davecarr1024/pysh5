@@ -1,10 +1,21 @@
-from typing import Optional
+from typing import Optional, Sequence
 from . import builtins_, statements, vals
-from ..core import parser
+
+
+def load(input: str) -> statements.Statement:
+    def load(statements_: Sequence[statements.Statement]) -> statements.Statement:
+        if len(statements_) == 1:
+            return statements_[0]
+        else:
+            return statements.Block(statements_)
+
+    _, statements_ = statements.Statement.parser_(
+    ).until_empty().convert(load).apply(input)
+    return statements_
 
 
 def eval(input: str, scope: Optional[vals.Scope] = None) -> vals.Val:
-    _, statement = statements.Statement.parser_()(input)
+    statement = load(input)
     scope = scope or vals.Scope()
     if isinstance(statement, statements.Block) and statement.statements:
         for s in statement.statements[:-1]:

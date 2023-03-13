@@ -75,36 +75,27 @@ class BlockTest(TestCase):
 
 class StatementTest(TestCase):
     def test_load(self):
-        for state, expected in list[tuple[tokens.TokenStream, Optional[parser.StateAndSingleResult[statements.Statement]]]]([
+        for state, expected in list[tuple[tokens.TokenStream | str, Optional[statements.Statement]]]([
             (
                 tokens.TokenStream([]),
-                (
-                    tokens.TokenStream([]),
-                    statements.Block(),
-                ),
+                None,
             ),
             (
                 tokens.TokenStream([
                     tokens.Token('{', '{'),
                     tokens.Token('}', '}'),
                 ]),
-                (
-                    tokens.TokenStream([]),
-                    statements.Block(),
-                ),
+                statements.Block(),
             ),
             (
                 tokens.TokenStream([
                     tokens.Token('int', '1'),
                     tokens.Token(';', ';'),
                 ]),
-                (
-                    tokens.TokenStream([]),
-                    statements.ExprStatement(
-                        exprs.ref(
-                            builtins_.int_(1),
-                        )
-                    ),
+                statements.ExprStatement(
+                    exprs.ref(
+                        builtins_.int_(1),
+                    )
                 ),
             ),
             (
@@ -126,14 +117,11 @@ class StatementTest(TestCase):
                     tokens.Token('int', '1'),
                     tokens.Token(';', ';'),
                 ]),
-                (
-                    tokens.TokenStream([]),
-                    statements.Assignment(
-                        exprs.ref('a'),
-                        exprs.ref(
-                            builtins_.int_(1)
-                        )
-                    ),
+                statements.Assignment(
+                    exprs.ref('a'),
+                    exprs.ref(
+                        builtins_.int_(1)
+                    )
                 ),
             ),
             (
@@ -141,10 +129,7 @@ class StatementTest(TestCase):
                     tokens.Token('return', 'return'),
                     tokens.Token(';', ';'),
                 ]),
-                (
-                    tokens.TokenStream([]),
-                    statements.Return(),
-                ),
+                statements.Return(),
             ),
             (
                 tokens.TokenStream([
@@ -152,14 +137,54 @@ class StatementTest(TestCase):
                     tokens.Token('int', '1'),
                     tokens.Token(';', ';'),
                 ]),
-                (
-                    tokens.TokenStream([]),
-                    statements.Return(
-                        exprs.ref(
-                            builtins_.int_(1)
-                        )
-                    ),
+                statements.Return(
+                    exprs.ref(
+                        builtins_.int_(1)
+                    )
                 ),
+            ),
+            (
+                '',
+                None,
+            ),
+            (
+                '1;',
+                statements.ExprStatement(
+                    exprs.ref(
+                        builtins_.int_(1)
+                    )
+                ),
+            ),
+            (
+                'return;',
+                statements.Return(),
+            ),
+            (
+                'return 1;',
+                statements.Return(
+                    exprs.ref(
+                        builtins_.int_(1)
+                    )
+                ),
+            ),
+            (
+                'a = 1;',
+                statements.Assignment(
+                    exprs.ref('a'),
+                    exprs.ref(builtins_.int_(1)),
+                ),
+            ),
+            (
+                '{ }',
+                statements.Block(),
+            ),
+            (
+                '{ 1; }',
+                statements.Block([
+                    statements.ExprStatement(
+                        exprs.ref(builtins_.int_(1))
+                    )
+                ]),
             ),
         ]):
             with self.subTest(state=state, expected=expected):
@@ -167,5 +192,7 @@ class StatementTest(TestCase):
                     with self.assertRaises(errors.Error):
                         statements.Statement.parser_()(state)
                 else:
-                    self.assertEqual(
-                        statements.Statement.parser_()(state), expected)
+                    state, result = statements.Statement.parser_()(state)
+                    self.assertEqual(state, tokens.TokenStream())
+                    self.assertEqual(result, expected,
+                                     f'{result} != {expected}')
