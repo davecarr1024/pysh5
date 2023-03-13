@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 import operator
 from typing import Any, Callable, Generic, Mapping, Sequence, Type, TypeVar
 from ..core import errors, lexer,  parser, tokens
-from . import classes, funcs, vals
+from . import classes, funcs, params, vals
 
 
 @dataclass(frozen=True)
@@ -77,8 +77,8 @@ class _BinaryFunc(funcs.BindableFunc):
     operator: Callable[[Any, Any], Any]
 
     @property
-    def params(self) -> vals.Params:
-        return vals.Params([vals.Param('lhs'), vals.Param('rhs')])
+    def params(self) -> params.Params:
+        return params.Params([params.Param('lhs'), params.Param('rhs')])
 
     def __call__(self, scope: vals.Scope, args: vals.Args) -> vals.Val:
         if len(args) != 2:

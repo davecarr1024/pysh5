@@ -1,14 +1,14 @@
 from dataclasses import dataclass
-from . import builtins_, funcs, statements, vals
+from . import builtins_, funcs, params, statements, vals
 
 
 @dataclass(frozen=True)
 class Func(funcs.AbstractFunc):
-    _params: vals.Params
+    _params: params.Params
     body: statements.Block
 
     @property
-    def params(self) -> vals.Params:
+    def params(self) -> params.Params:
         return self._params
 
     def __call__(self, scope: vals.Scope, args: vals.Args) -> vals.Val:

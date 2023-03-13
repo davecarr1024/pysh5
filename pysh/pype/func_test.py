@@ -1,5 +1,5 @@
 from unittest import TestCase
-from . import builtins_, classes, exprs, func, statements, vals
+from . import builtins_, classes, exprs, func, params, statements, vals
 
 
 class FuncTest(TestCase):
@@ -7,7 +7,7 @@ class FuncTest(TestCase):
         for func_, args, expected in list[tuple[func.Func, vals.Args, vals.Val]]([
             (
                 func.Func(
-                    vals.Params([
+                    params.Params([
                     ]),
                     statements.Block([
                     ]),
@@ -18,7 +18,7 @@ class FuncTest(TestCase):
             ),
             (
                 func.Func(
-                    vals.Params([
+                    params.Params([
                     ]),
                     statements.Block([
                         statements.Assignment(
@@ -31,7 +31,7 @@ class FuncTest(TestCase):
             ),
             (
                 func.Func(
-                    vals.Params([
+                    params.Params([
                     ]),
                     statements.Block([
                         statements.Return(exprs.ref(builtins_.int_(1))),
@@ -43,8 +43,8 @@ class FuncTest(TestCase):
             ),
             (
                 func.Func(
-                    vals.Params([
-                        vals.Param('a'),
+                    params.Params([
+                        params.Param('a'),
                     ]),
                     statements.Block([
                         statements.Return(exprs.Ref(exprs.Ref.Name('a'))),
@@ -65,8 +65,8 @@ class MethodTest(TestCase):
         for method, object_, args, expected in list[tuple[func.Method, vals.Val, vals.Args, vals.Val]]([
             (
                 func.Method(
-                    vals.Params([
-                        vals.Param('self'),
+                    params.Params([
+                        params.Param('self'),
                     ]),
                     statements.Block([
                         statements.Return(exprs.Ref(exprs.Ref.Name(

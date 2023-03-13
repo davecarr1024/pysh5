@@ -1,5 +1,5 @@
 from unittest import TestCase
-from . import builtins_, classes, exprs, func, statements, vals
+from . import builtins_, classes, exprs, func, params, statements, vals
 
 
 class ClassTest(TestCase):
@@ -22,7 +22,7 @@ class ClassTest(TestCase):
             'c',
             vals.Scope({
                 '__init__': func.Method(
-                    vals.Params([vals.Param('self')]),
+                    params.Params([params.Param('self')]),
                     statements.Block([
                         statements.Assignment(exprs.ref('self', 'a'),
                                               exprs.ref(builtins_.int_(1))),

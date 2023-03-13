@@ -160,7 +160,7 @@ def toks(*vals: str | tokens.Token) -> tokens.TokenStream:
 
 
 class RuleTest(TestCase):
-    def test_and(self):
+    def test_and(self) -> None:
         no_result_str: str = 'a'
         no_result_lexrule: lexer.Rule = lexer.Rule.load(no_result_str)
         no_result_rule: parser.NoResultRule[Val] = parser.LexRule[Val].load(
@@ -219,18 +219,22 @@ class RuleTest(TestCase):
             (
                 no_result_rule,
                 optional_result_rule,
-                parser.OptionalResultAnd([
-                    no_result_rule,
-                    optional_result_rule,
-                ]),
+                parser.OptionalResultAnd(
+                    list[parser.NoResultRule[Val] | parser.OptionalResultRule[Val]]([
+                        no_result_rule,
+                        optional_result_rule,
+                    ])
+                ),
             ),
             (
                 no_result_rule,
                 single_result_rule,
-                parser.SingleResultAnd([
-                    no_result_rule,
-                    single_result_rule,
-                ]),
+                parser.SingleResultAnd(
+                    list[parser.NoResultRule[Val] | parser.SingleResultRule[Val]]([
+                        no_result_rule,
+                        single_result_rule,
+                    ])
+                ),
             ),
             (
                 no_result_rule,
@@ -244,26 +248,32 @@ class RuleTest(TestCase):
             (
                 optional_result_rule,
                 no_result_str,
-                parser.OptionalResultAnd([
-                    optional_result_rule,
-                    no_result_rule,
-                ]),
+                parser.OptionalResultAnd(
+                    list[parser.NoResultRule[Val] | parser.OptionalResultRule[Val]]([
+                        optional_result_rule,
+                        no_result_rule,
+                    ])
+                ),
             ),
             (
                 optional_result_rule,
                 no_result_lexrule,
-                parser.OptionalResultAnd([
-                    optional_result_rule,
-                    no_result_rule,
-                ]),
+                parser.OptionalResultAnd(
+                    list[parser.NoResultRule[Val] | parser.OptionalResultRule[Val]]([
+                        optional_result_rule,
+                        no_result_rule,
+                    ])
+                ),
             ),
             (
                 optional_result_rule,
                 no_result_rule,
-                parser.OptionalResultAnd([
-                    optional_result_rule,
-                    no_result_rule,
-                ]),
+                parser.OptionalResultAnd(
+                    list[parser.NoResultRule[Val] | parser.OptionalResultRule[Val]]([
+                        optional_result_rule,
+                        no_result_rule,
+                    ])
+                ),
             ),
             (
                 optional_result_rule,
@@ -293,26 +303,32 @@ class RuleTest(TestCase):
             (
                 single_result_rule,
                 no_result_str,
-                parser.SingleResultAnd([
-                    single_result_rule,
-                    no_result_rule,
-                ]),
+                parser.SingleResultAnd(
+                    list[parser.NoResultRule[Val] | parser.SingleResultRule[Val]]([
+                        single_result_rule,
+                        no_result_rule,
+                    ])
+                ),
             ),
             (
                 single_result_rule,
                 no_result_lexrule,
-                parser.SingleResultAnd([
-                    single_result_rule,
-                    no_result_rule,
-                ]),
+                parser.SingleResultAnd(
+                    list[parser.NoResultRule[Val] | parser.SingleResultRule[Val]]([
+                        single_result_rule,
+                        no_result_rule,
+                    ])
+                ),
             ),
             (
                 single_result_rule,
                 no_result_rule,
-                parser.SingleResultAnd([
-                    single_result_rule,
-                    no_result_rule,
-                ]),
+                parser.SingleResultAnd(
+                    list[parser.NoResultRule[Val] | parser.SingleResultRule[Val]]([
+                        single_result_rule,
+                        no_result_rule,
+                    ])
+                ),
             ),
             (
                 single_result_rule,
@@ -635,7 +651,7 @@ class RuleTest(TestCase):
             with self.subTest(lhs=lhs, rhs=rhs, expected=expected):
                 self.assertEqual(lhs & rhs, expected)
 
-    def test_rand(self):
+    def test_rand(self) -> None:
         no_result_str: str = 'a'
         no_result_lexrule: lexer.Rule = lexer.Rule.load(no_result_str)
         no_result_rule: parser.NoResultRule[Val] = parser.LexRule[Val].load(
@@ -683,35 +699,43 @@ class RuleTest(TestCase):
             (
                 no_result_str,
                 optional_result_rule,
-                parser.OptionalResultAnd([
-                    no_result_rule,
-                    optional_result_rule,
-                ]),
+                parser.OptionalResultAnd(
+                    list[parser.NoResultRule[Val] | parser.OptionalResultRule[Val]]([
+                        no_result_rule,
+                        optional_result_rule,
+                    ])
+                ),
             ),
             (
                 no_result_lexrule,
                 optional_result_rule,
-                parser.OptionalResultAnd([
-                    no_result_rule,
-                    optional_result_rule,
-                ]),
+                parser.OptionalResultAnd(
+                    list[parser.NoResultRule[Val] | parser.OptionalResultRule[Val]]([
+                        no_result_rule,
+                        optional_result_rule,
+                    ])
+                ),
             ),
             # single_result_rule
             (
                 no_result_str,
                 single_result_rule,
-                parser.SingleResultAnd([
-                    no_result_rule,
-                    single_result_rule,
-                ]),
+                parser.SingleResultAnd(
+                    list[parser.NoResultRule[Val] | parser.SingleResultRule[Val]]([
+                        no_result_rule,
+                        single_result_rule,
+                    ])
+                ),
             ),
             (
                 no_result_lexrule,
                 single_result_rule,
-                parser.SingleResultAnd([
-                    no_result_rule,
-                    single_result_rule,
-                ]),
+                parser.SingleResultAnd(
+                    list[parser.NoResultRule[Val] | parser.SingleResultRule[Val]]([
+                        no_result_rule,
+                        single_result_rule,
+                    ])
+                ),
             ),
             # multiple_result_rule
             (
@@ -837,7 +861,7 @@ class RuleTest(TestCase):
             with self.subTest(lhs=lhs, rhs=rhs, expected=expected):
                 self.assertEqual(lhs | rhs, expected)
 
-    def test_call(self):
+    def test_call(self) -> None:
         load_int: parser.SingleResultRule[Val] = Int._parse_rule()
         load_str: parser.SingleResultRule[Val] = Str._parse_rule()
         parser_: parser.Parser[Val] = Val.parser_()

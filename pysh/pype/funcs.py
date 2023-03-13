@@ -1,13 +1,13 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from . import statements, vals
 from ..core import errors
+from . import params, vals
 
 
 class AbstractFunc(ABC, vals.Val):
     @property
     @abstractmethod
-    def params(self) -> vals.Params:
+    def params(self) -> params.Params:
         ...
 
 
@@ -30,7 +30,7 @@ class BoundFunc(AbstractFunc):
     object_: vals.Val
 
     @property
-    def params(self) -> vals.Params:
+    def params(self) -> params.Params:
         return self.func.params.tail
 
     def __call__(self, scope: vals.Scope, args: vals.Args) -> vals.Val:

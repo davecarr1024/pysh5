@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field, fields
-from typing import Any, Callable, Container, Generic, Iterable, Iterator, Mapping, MutableSequence, Optional, Sequence, Set, Sized, Type,  TypeVar, Union, overload
+from typing import Callable, Generic, Iterable, Iterator, Mapping, MutableSequence, Optional, Sequence, Sized, Type,  TypeVar, Union, overload
 from . import errors, lexer, tokens
 
 _Result = TypeVar('_Result')
@@ -1221,6 +1221,7 @@ class ParsableWithContext(ABC, Generic[_ParsableWithContextType, _ParsableContex
         return Ref[_ParsableWithContextType](cls._name())
 
     @classmethod
+    @abstractmethod
     def _parse_rule(cls, context: _ParsableContext) -> SingleResultRule[_ParsableWithContextType]:
         ...
 

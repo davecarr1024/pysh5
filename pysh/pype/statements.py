@@ -1,6 +1,6 @@
-from abc import ABC, abstractmethod
+from abc import abstractmethod
 from dataclasses import dataclass, field
-from typing import Iterable, Iterator, MutableSequence, Optional, Sequence, Sized, Type
+from typing import Iterable, Iterator, Optional, Sequence, Sized, Type
 from . import exprs,  vals
 from ..core import errors, lexer, parser, tokens
 
