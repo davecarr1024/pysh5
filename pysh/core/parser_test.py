@@ -11,7 +11,7 @@ if 'unittest.util' in __import__('sys').modules:
 
 class Val(parser.Parsable['Val']):
     @classmethod
-    def types(cls) -> Sequence[Type['Val']]:
+    def _types(cls) -> Sequence[Type['Val']]:
         return [
             Int,
             Str,
@@ -72,7 +72,7 @@ class List(Val):
 
 class Expr(parser.Parsable['Expr']):
     @classmethod
-    def types(cls) -> Sequence[Type['Expr']]:
+    def _types(cls) -> Sequence[Type['Expr']]:
         return [
             Literal,
         ]
@@ -1534,7 +1534,7 @@ class RuleTest(TestCase):
             ),
         ]):
             with self.subTest(state=input, expected=expected):
-                state, expr = rule.apply(input)
+                state, expr = rule.eval(input)
                 self.assertEqual(state, toks())
                 self.assertEqual(expr, expected)
 

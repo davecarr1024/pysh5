@@ -52,7 +52,7 @@ class Object(parser.Parsable['Object'], classes.Object, ABC):
         ...
 
     @classmethod
-    def types(cls) -> Sequence[Type['Object']]:
+    def _types(cls) -> Sequence[Type['Object']]:
         return [
             _IntObject,
             _NoneObject,

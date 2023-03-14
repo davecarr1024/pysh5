@@ -358,7 +358,7 @@ class SingleResultRule(Rule[_Result]):
             lex_rule = lexer.Rule.load(lex_rule)
         return UntilToken[_Result](self, lex_rule)
 
-    def apply(self, input: str | tokens.TokenStream, scope: Optional[Scope[_Result]] = None) -> StateAndSingleResult[_Result]:
+    def eval(self, input: str | tokens.TokenStream, scope: Optional[Scope[_Result]] = None) -> StateAndSingleResult[_Result]:
         if isinstance(input, str):
             input = self.lexer_(input)
         if scope is None:
@@ -1187,11 +1187,11 @@ class Parsable(ABC, Generic[_ParsableType]):
     @classmethod
     @abstractmethod
     def _parse_rule(cls) -> SingleResultRule[_ParsableType]:
-        return Or[_ParsableType]([type.ref() for type in cls.types()])
+        return Or[_ParsableType]([type.ref() for type in cls._types()])
 
     @classmethod
     @abstractmethod
-    def types(cls) -> Sequence[Type[_ParsableType]]:
+    def _types(cls) -> Sequence[Type[_ParsableType]]:
         ...
 
     @classmethod
@@ -1201,7 +1201,7 @@ class Parsable(ABC, Generic[_ParsableType]):
             Scope[_ParsableType](
                 {cls._name(): cls._parse_rule()} |
                 {type._name(): type._parse_rule()
-                 for type in cls.types()}
+                 for type in cls._types()}
             )
         )
 

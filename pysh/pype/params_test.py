@@ -13,7 +13,7 @@ class ParamTest(TestCase):
             ),
         ]):
             with self.subTest(input=input, expected=expected):
-                state, actual = params.Param.parse_rule().apply(input)
+                state, actual = params.Param.parse_rule().eval(input)
                 self.assertEqual(state, tokens.TokenStream())
                 self.assertEqual(actual, expected)
 
@@ -128,8 +128,8 @@ class ParamsTest(TestCase):
             with self.subTest(input=input, expected=expected):
                 if expected is None:
                     with self.assertRaises(errors.Error):
-                        params.Params.parse_rule().apply(input)
+                        params.Params.parse_rule().eval(input)
                 else:
-                    state, actual = params.Params.parse_rule().apply(input)
+                    state, actual = params.Params.parse_rule().eval(input)
                     self.assertEqual(state, tokens.TokenStream())
                     self.assertEqual(actual, expected)

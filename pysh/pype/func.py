@@ -24,20 +24,19 @@ class Func(funcs.AbstractFunc):
         else:
             return builtins_.none
 
+    @dataclass(frozen=True)
+    class Decl(statements.Decl):
+        func: 'Func'
+
+        @property
+        def val(self) -> exprs.Expr:
+            return exprs.ref(self.func)
+
+        @classmethod
+        def _parse_rule(cls) -> parser.SingleResultRule[statements.Statement]:
+            raise NotImplementedError()
+
 
 @dataclass(frozen=True)
 class Method(Func, funcs.BindableFunc):
     ...
-
-
-@dataclass(frozen=True)
-class Decl(statements.AbstractDecl):
-    func: Func
-
-    @property
-    def val(self) -> exprs.Expr:
-        return exprs.ref(self.func)
-
-    @classmethod
-    def _parse_rule(cls) -> parser.SingleResultRule[statements.Statement]:
-        raise NotImplementedError()

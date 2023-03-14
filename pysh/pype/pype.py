@@ -10,7 +10,7 @@ def load(input: str) -> statements.Statement:
             return statements.Block(statements_)
 
     _, statements_ = statements.Statement.parser_(
-    ).until_empty().convert(load).apply(input)
+    ).until_empty().convert(load).eval(input)
     return statements_
 
 

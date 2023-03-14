@@ -228,7 +228,7 @@ class ArgTest(TestCase):
         ]):
             with self.subTest(input=input, expected=expected):
                 state, expr = exprs.Arg.parse_rule(
-                    exprs.Expr.parser_().scope).apply(input)
+                    exprs.Expr.parser_().scope).eval(input)
                 self.assertEqual(state, tokens.TokenStream())
                 self.assertEqual(expr, expected)
 
@@ -373,10 +373,10 @@ class ArgsTest(TestCase):
                 if expected is None:
                     with self.assertRaises(errors.Error):
                         exprs.Args.parse_rule(
-                            exprs.Expr.parser_().scope).apply(input)
+                            exprs.Expr.parser_().scope).eval(input)
                 else:
                     state, actual = exprs.Args.parse_rule(
-                        exprs.Expr.parser_().scope).apply(input)
+                        exprs.Expr.parser_().scope).eval(input)
                     self.assertEqual(state, tokens.TokenStream())
                     self.assertEqual(actual, expected,
                                      f'{actual} != {expected}')

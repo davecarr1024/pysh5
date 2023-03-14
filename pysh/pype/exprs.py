@@ -11,7 +11,7 @@ class Expr(parser.Parsable['Expr']):
         ...
 
     @classmethod
-    def types(cls) -> Sequence[Type['Expr']]:
+    def _types(cls) -> Sequence[Type['Expr']]:
         return [
             Ref,
         ]
@@ -77,7 +77,7 @@ class Ref(Expr):
             raise errors.Error(msg=f'unable to set ref head {self}')
 
         @classmethod
-        def types(cls) -> Sequence[Type['Ref.Head']]:
+        def _types(cls) -> Sequence[Type['Ref.Head']]:
             return [
                 Ref.Name,
                 Ref.Literal,

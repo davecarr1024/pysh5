@@ -39,7 +39,7 @@ class Statement(parser.Parsable['Statement']):
         ...
 
     @classmethod
-    def types(cls) -> Sequence[Type['Statement']]:
+    def _types(cls) -> Sequence[Type['Statement']]:
         # from . import func
         return [
             Return,
@@ -139,7 +139,7 @@ class Return(Statement):
 
 
 @dataclass(frozen=True)
-class AbstractDecl(Statement):
+class Decl(Statement):
     name: str
 
     @property
