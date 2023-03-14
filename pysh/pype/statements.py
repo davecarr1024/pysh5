@@ -40,13 +40,13 @@ class Statement(parser.Parsable['Statement']):
 
     @classmethod
     def types(cls) -> Sequence[Type['Statement']]:
-        from . import func
+        # from . import func
         return [
             Return,
             Block,
             ExprStatement,
             Assignment,
-            func.Decl,
+            # func.Decl,
         ]
 
 
