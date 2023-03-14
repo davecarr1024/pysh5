@@ -126,7 +126,7 @@ class Ref(Expr):
             raise errors.Error(msg=f'unable to set ref tail {self}')
 
         @classmethod
-        def types(cls) -> Sequence[Type['Ref.Tail']]:
+        def _types(cls) -> Sequence[Type['Ref.Tail']]:
             return [
                 Ref.Member,
                 Ref.Call,

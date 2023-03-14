@@ -1227,7 +1227,7 @@ class ParsableWithContext(ABC, Generic[_ParsableWithContextType, _ParsableContex
 
     @classmethod
     @abstractmethod
-    def types(cls) -> Sequence[Type[_ParsableWithContextType]]:
+    def _types(cls) -> Sequence[Type[_ParsableWithContextType]]:
         ...
 
     @classmethod
@@ -1235,8 +1235,8 @@ class ParsableWithContext(ABC, Generic[_ParsableWithContextType, _ParsableContex
         return Parser[_ParsableWithContextType](
             cls._name(),
             Scope[_ParsableWithContextType](
-                {cls._name(): Or[_ParsableWithContextType]([type.ref() for type in cls.types()])} |
+                {cls._name(): Or[_ParsableWithContextType]([type.ref() for type in cls._types()])} |
                 {type._name(): type._parse_rule(context)
-                 for type in cls.types()}
+                 for type in cls._types()}
             )
         )
