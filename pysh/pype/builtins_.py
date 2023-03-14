@@ -72,9 +72,14 @@ _BuiltinExtractor = Callable[[vals.Scope, vals.Val], Any]
 
 @dataclass(frozen=True)
 class _BinaryFunc(funcs.BindableFunc):
+    _name: str
     lhs: _BuiltinExtractor
     rhs: _BuiltinExtractor
     operator: Callable[[Any, Any], Any]
+
+    @property
+    def name(self) -> str:
+        return self._name
 
     @property
     def params(self) -> params.Params:
@@ -90,9 +95,11 @@ class _BinaryFunc(funcs.BindableFunc):
 
 
 def _binary_func(
+        name: str,
         object_type: Type[Object],
         operator: Callable[[Any, Any], Any]) -> _BinaryFunc:
     return _BinaryFunc(
+        name,
         object_type.from_val,
         object_type.from_val,
         operator,
@@ -124,7 +131,7 @@ class _IntObject(_ValueObject[int]):
 _IntClass = _Class(
     'int',
     vals.Scope({
-        '__add__': _binary_func(_IntObject, operator.add),
+        '__add__': _binary_func('__add__', _IntObject, operator.add),
     }),
     _IntObject,
 )

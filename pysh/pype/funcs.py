@@ -7,6 +7,11 @@ from . import params, vals
 class AbstractFunc(ABC, vals.Val):
     @property
     @abstractmethod
+    def name(self) -> str:
+        ...
+
+    @property
+    @abstractmethod
     def params(self) -> params.Params:
         ...
 
@@ -32,6 +37,10 @@ class BoundFunc(AbstractFunc):
     @property
     def params(self) -> params.Params:
         return self.func.params.tail
+
+    @property
+    def name(self) -> str:
+        return self.func.name
 
     def __call__(self, scope: vals.Scope, args: vals.Args) -> vals.Val:
         return self.func(scope, args.prepend(vals.Arg(self.object_)))

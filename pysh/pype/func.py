@@ -1,11 +1,17 @@
 from dataclasses import dataclass
-from . import builtins_, funcs, params, statements, vals
+from ..core import parser
+from . import builtins_, exprs, funcs, params, statements, vals
 
 
 @dataclass(frozen=True)
 class Func(funcs.AbstractFunc):
+    _name: str
     _params: params.Params
     body: statements.Block
+
+    @property
+    def name(self) -> str:
+        return self._name
 
     @property
     def params(self) -> params.Params:
@@ -22,3 +28,16 @@ class Func(funcs.AbstractFunc):
 @dataclass(frozen=True)
 class Method(Func, funcs.BindableFunc):
     ...
+
+
+@dataclass(frozen=True)
+class Decl(statements.AbstractDecl):
+    func: Func
+
+    @property
+    def val(self) -> exprs.Expr:
+        return exprs.ref(self.func)
+
+    @classmethod
+    def _parse_rule(cls) -> parser.SingleResultRule[statements.Statement]:
+        raise NotImplementedError()

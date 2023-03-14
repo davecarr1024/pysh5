@@ -105,4 +105,3 @@ class Args(Sized, Iterable[Arg]):
 
     def prepend(self, arg: Arg) -> 'Args':
         return Args([arg]+list(self.args))
-

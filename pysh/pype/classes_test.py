@@ -22,6 +22,7 @@ class ClassTest(TestCase):
             'c',
             vals.Scope({
                 '__init__': func.Method(
+                    'f',
                     params.Params([params.Param('self')]),
                     statements.Block([
                         statements.Assignment(exprs.ref('self', 'a'),

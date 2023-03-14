@@ -40,11 +40,13 @@ class Statement(parser.Parsable['Statement']):
 
     @classmethod
     def types(cls) -> Sequence[Type['Statement']]:
+        from . import func
         return [
             Return,
             Block,
             ExprStatement,
             Assignment,
+            func.Decl,
         ]
 
 
@@ -134,3 +136,17 @@ class Return(Statement):
             exprs.Expr.parser_().zero_or_one() &
             ';'
         ).convert_type(load).with_lexer(lexer.Lexer.whitespace())
+
+
+@dataclass(frozen=True)
+class AbstractDecl(Statement):
+    name: str
+
+    @property
+    @abstractmethod
+    def val(self) -> exprs.Expr:
+        ...
+
+    def eval(self, scope: vals.Scope) -> Statement.Result:
+        scope[self.name] = self.val.eval(scope)
+        return Statement.Result()

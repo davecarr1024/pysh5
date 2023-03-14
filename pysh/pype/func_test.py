@@ -7,6 +7,7 @@ class FuncTest(TestCase):
         for func_, args, expected in list[tuple[func.Func, vals.Args, vals.Val]]([
             (
                 func.Func(
+                    'f',
                     params.Params([
                     ]),
                     statements.Block([
@@ -18,6 +19,7 @@ class FuncTest(TestCase):
             ),
             (
                 func.Func(
+                    'f',
                     params.Params([
                     ]),
                     statements.Block([
@@ -31,6 +33,7 @@ class FuncTest(TestCase):
             ),
             (
                 func.Func(
+                    'f',
                     params.Params([
                     ]),
                     statements.Block([
@@ -43,6 +46,7 @@ class FuncTest(TestCase):
             ),
             (
                 func.Func(
+                    'f',
                     params.Params([
                         params.Param('a'),
                     ]),
@@ -65,6 +69,7 @@ class MethodTest(TestCase):
         for method, object_, args, expected in list[tuple[func.Method, vals.Val, vals.Args, vals.Val]]([
             (
                 func.Method(
+                    'f',
                     params.Params([
                         params.Param('self'),
                     ]),
