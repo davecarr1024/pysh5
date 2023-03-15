@@ -188,6 +188,7 @@ class RuleTest(TestCase):
                 parser.SingleResultRule[Val],
                 parser.MultipleResultRule[Val],
                 parser.OptionalResultRule[Val],
+                Type[parser.Parsable[Val]],
             ],
             parser.Rule[Val],
         ]]([
@@ -244,6 +245,16 @@ class RuleTest(TestCase):
                     multiple_result_rule,
                 ]),
             ),
+            (
+                no_result_rule,
+                Val,
+                parser.SingleResultAnd(
+                    list[parser.NoResultRule[Val] | parser.SingleResultRule[Val]]([
+                        no_result_rule,
+                        Val.ref(),
+                    ])
+                ),
+            ),
             # optional_result_rule
             (
                 optional_result_rule,
@@ -298,6 +309,16 @@ class RuleTest(TestCase):
                     optional_result_rule,
                     multiple_result_rule,
                 ]),
+            ),
+            (
+                optional_result_rule,
+                Val,
+                parser.MultipleResultAnd(
+                    list[parser.OptionalResultRule[Val] | parser.SingleResultRule[Val]]([
+                        optional_result_rule,
+                        Val.ref(),
+                    ])
+                ),
             ),
             # single_result_rule
             (
@@ -354,6 +375,16 @@ class RuleTest(TestCase):
                     multiple_result_rule,
                 ]),
             ),
+            (
+                single_result_rule,
+                Val,
+                parser.MultipleResultAnd(
+                    list[parser.SingleResultRule[Val]]([
+                        single_result_rule,
+                        Val.ref(),
+                    ])
+                ),
+            ),
             # multiple_result_rule
             (
                 multiple_result_rule,
@@ -402,6 +433,16 @@ class RuleTest(TestCase):
                     multiple_result_rule,
                     multiple_result_rule,
                 ]),
+            ),
+            (
+                multiple_result_rule,
+                Val,
+                parser.MultipleResultAnd(
+                    list[parser.MultipleResultRule[Val] | parser.SingleResultRule[Val]]([
+                        multiple_result_rule,
+                        Val.ref(),
+                    ])
+                ),
             ),
             # no_result_and
             (
@@ -461,6 +502,16 @@ class RuleTest(TestCase):
                     list(no_result_and) +
                     [
                         multiple_result_rule,
+                    ]
+                ),
+            ),
+            (
+                no_result_and,
+                Val,
+                parser.SingleResultAnd(
+                    list(no_result_and) +
+                    [
+                        Val.ref(),
                     ]
                 ),
             ),
@@ -525,6 +576,16 @@ class RuleTest(TestCase):
                     ]
                 ),
             ),
+            (
+                optional_result_and,
+                Val,
+                parser.MultipleResultAnd(
+                    list(optional_result_and) +
+                    [
+                        Val.ref(),
+                    ]
+                ),
+            ),
             # single_result_and
             (
                 single_result_and,
@@ -583,6 +644,16 @@ class RuleTest(TestCase):
                     list(single_result_and) +
                     [
                         multiple_result_rule,
+                    ]
+                ),
+            ),
+            (
+                single_result_and,
+                Val,
+                parser.MultipleResultAnd(
+                    list(single_result_and) +
+                    [
+                        Val.ref(),
                     ]
                 ),
             ),
@@ -647,6 +718,16 @@ class RuleTest(TestCase):
                     ]
                 ),
             ),
+            (
+                multiple_result_and,
+                Val,
+                parser.MultipleResultAnd(
+                    list(multiple_result_and) +
+                    [
+                        Val.ref(),
+                    ]
+                ),
+            ),
         ]):
             with self.subTest(lhs=lhs, rhs=rhs, expected=expected):
                 self.assertEqual(lhs & rhs, expected)
@@ -669,6 +750,7 @@ class RuleTest(TestCase):
             Union[
                 str,
                 lexer.Rule,
+                Type[parser.Parsable[Val]],
             ],
             Union[
                 parser.NoResultRule[Val],
@@ -695,6 +777,16 @@ class RuleTest(TestCase):
                     no_result_rule,
                 ]),
             ),
+            (
+                Val,
+                no_result_rule,
+                parser.SingleResultAnd(
+                    list[parser.NoResultRule[Val] | parser.SingleResultRule[Val]]([
+                        Val.ref(),
+                        no_result_rule,
+                    ])
+                ),
+            ),
             # optional_result_rule
             (
                 no_result_str,
@@ -712,6 +804,16 @@ class RuleTest(TestCase):
                 parser.OptionalResultAnd(
                     list[parser.NoResultRule[Val] | parser.OptionalResultRule[Val]]([
                         no_result_rule,
+                        optional_result_rule,
+                    ])
+                ),
+            ),
+            (
+                Val,
+                optional_result_rule,
+                parser.MultipleResultAnd(
+                    list[parser.OptionalResultRule[Val] | parser.SingleResultRule[Val]]([
+                        Val.ref(),
                         optional_result_rule,
                     ])
                 ),
@@ -737,6 +839,16 @@ class RuleTest(TestCase):
                     ])
                 ),
             ),
+            (
+                Val,
+                single_result_rule,
+                parser.MultipleResultAnd(
+                    list[parser.OptionalResultRule[Val] | parser.SingleResultRule[Val]]([
+                        Val.ref(),
+                        single_result_rule,
+                    ])
+                ),
+            ),
             # multiple_result_rule
             (
                 no_result_str,
@@ -754,6 +866,16 @@ class RuleTest(TestCase):
                     multiple_result_rule,
                 ]),
             ),
+            (
+                Val,
+                multiple_result_rule,
+                parser.MultipleResultAnd(
+                    list[parser.MultipleResultRule[Val] | parser.SingleResultRule[Val]]([
+                        Val.ref(),
+                        multiple_result_rule,
+                    ])
+                ),
+            ),
             # no_result_and
             (
                 no_result_str,
@@ -768,6 +890,14 @@ class RuleTest(TestCase):
                 no_result_and,
                 parser.NoResultAnd(
                     [no_result_rule]
+                    + list(no_result_and)
+                ),
+            ),
+            (
+                Val,
+                no_result_and,
+                parser.SingleResultAnd(
+                    [Val.ref()]
                     + list(no_result_and)
                 ),
             ),
@@ -788,6 +918,14 @@ class RuleTest(TestCase):
                     + list(optional_result_and)
                 ),
             ),
+            (
+                Val,
+                optional_result_and,
+                parser.MultipleResultAnd(
+                    [Val.ref()]
+                    + list(optional_result_and)
+                ),
+            ),
             # single_result_and
             (
                 no_result_str,
@@ -805,6 +943,14 @@ class RuleTest(TestCase):
                     + list(single_result_and)
                 ),
             ),
+            (
+                Val,
+                single_result_and,
+                parser.MultipleResultAnd(
+                    [Val.ref()]
+                    + list(single_result_and)
+                ),
+            ),
             # multiple_result_and
             (
                 no_result_str,
@@ -819,6 +965,14 @@ class RuleTest(TestCase):
                 multiple_result_and,
                 parser.MultipleResultAnd(
                     [no_result_rule]
+                    + list(multiple_result_and)
+                ),
+            ),
+            (
+                Val,
+                multiple_result_and,
+                parser.MultipleResultAnd(
+                    [Val.ref()]
                     + list(multiple_result_and)
                 ),
             ),

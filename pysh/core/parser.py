@@ -115,6 +115,13 @@ _AndArgs = Union[
     'MultipleResultRule[_Result]',
     lexer.Rule,
     str,
+    'Type[_AbstractParsable[_Result]]',
+]
+
+_RandArgs = Union[
+    str,
+    lexer.Rule,
+    'Type[_AbstractParsable[_Result]]',
 ]
 
 
@@ -147,7 +154,11 @@ class NoResultRule(Rule[_Result]):
     def __and__(self, rhs: str) -> 'NoResultAnd[_Result]':
         ...
 
-    def __and__(self, rhs: _AndArgs``) -> 'Rule[_Result]':
+    @overload
+    def __and__(self, rhs: 'Type[Parsable[_ParsableType]]') -> 'SingleResultAnd[_Result]':
+        ...
+
+    def __and__(self, rhs: _AndArgs) -> 'Rule[_Result]':
         if isinstance(rhs, NoResultRule):
             return NoResultAnd([self, rhs])
         elif isinstance(rhs, OptionalResultRule):
@@ -160,11 +171,30 @@ class NoResultRule(Rule[_Result]):
             return NoResultAnd([self, LexRule(rhs)])
         elif isinstance(rhs, str):
             return NoResultAnd([self, LexRule.load(rhs)])
+        elif issubclass(rhs, _AbstractParsable):
+            return SingleResultAnd([self, rhs.ref()])
         else:
             raise TypeError(type(rhs))
 
-    def __rand__(self, lhs: str | lexer.Rule) -> 'NoResultAnd[_Result]':
-        return NoResultAnd([LexRule.load(lhs), self])
+    @overload
+    def __rand__(self, lhs: str) -> 'NoResultAnd[_Result]':
+        ...
+
+    @overload
+    def __rand__(self, lhs: lexer.Rule) -> 'NoResultAnd[_Result]':
+        ...
+
+    @overload
+    def __rand__(self, lhs: Type['Parsable[_ParsableType]']) -> 'SingleResultAnd[_Result]':
+        ...
+
+    def __rand__(self, lhs: _RandArgs) -> 'Rule[_Result]':
+        if isinstance(lhs, str) or isinstance(lhs, lexer.Rule):
+            return NoResultAnd([LexRule.load(lhs), self])
+        elif issubclass(lhs, Parsable):
+            return SingleResultAnd([lhs.ref(), self])
+        else:
+            raise TypeError(type(lhs))
 
     def single(self) -> 'SingleResultRule[_Result]':
         raise errors.Error(
@@ -242,6 +272,10 @@ class SingleResultRule(Rule[_Result]):
     def __and__(self, rhs: str) -> 'SingleResultAnd[_Result]':
         ...
 
+    @overload
+    def __and__(self, rhs: 'Type[Parsable[_ParsableType]]') -> 'MultipleResultAnd[_Result]':
+        ...
+
     def __and__(self, rhs: _AndArgs) -> 'Rule[_Result]':
         if isinstance(rhs, NoResultRule):
             return SingleResultAnd([self, rhs])
@@ -255,11 +289,30 @@ class SingleResultRule(Rule[_Result]):
             return SingleResultAnd([self, LexRule(rhs)])
         elif isinstance(rhs, str):
             return SingleResultAnd([self, LexRule.load(rhs)])
+        elif issubclass(rhs, _AbstractParsable):
+            return MultipleResultAnd([self, rhs.ref()])
         else:
             raise TypeError(type(rhs))
 
-    def __rand__(self, lhs: str | lexer.Rule) -> 'SingleResultAnd[_Result]':
-        return SingleResultAnd([LexRule.load(lhs), self])
+    @overload
+    def __rand__(self, lhs: str) -> 'SingleResultAnd[_Result]':
+        ...
+
+    @overload
+    def __rand__(self, lhs: lexer.Rule) -> 'SingleResultAnd[_Result]':
+        ...
+
+    @overload
+    def __rand__(self, lhs: Type['Parsable[_ParsableType]']) -> 'MultipleResultAnd[_Result]':
+        ...
+
+    def __rand__(self, lhs: _RandArgs) -> 'Rule[_Result]':
+        if isinstance(lhs, str) or isinstance(lhs, lexer.Rule):
+            return SingleResultAnd([LexRule.load(lhs), self])
+        elif issubclass(lhs, Parsable):
+            return MultipleResultAnd([lhs.ref(), self])
+        else:
+            raise TypeError(type(lhs))
 
     def __or__(self, rhs: 'SingleResultRule[_Result]') -> 'Or[_Result]':
         return Or[_Result]([self, rhs])
@@ -390,6 +443,10 @@ class OptionalResultRule(Rule[_Result]):
     def __and__(self, rhs: str) -> 'OptionalResultAnd[_Result]':
         ...
 
+    @overload
+    def __and__(self, rhs: 'Type[Parsable[_ParsableType]]') -> 'MultipleResultAnd[_Result]':
+        ...
+
     def __and__(self, rhs: _AndArgs) -> 'Rule[_Result]':
         if isinstance(rhs, NoResultRule):
             return OptionalResultAnd([self, rhs])
@@ -403,11 +460,30 @@ class OptionalResultRule(Rule[_Result]):
             return OptionalResultAnd([self, LexRule(rhs)])
         elif isinstance(rhs, str):
             return OptionalResultAnd([self, LexRule.load(rhs)])
+        elif issubclass(rhs, _AbstractParsable):
+            return MultipleResultAnd([self, rhs.ref()])
         else:
             raise TypeError(type(rhs))
 
-    def __rand__(self, lhs: str | lexer.Rule) -> 'OptionalResultAnd[_Result]':
-        return OptionalResultAnd([LexRule.load(lhs), self])
+    @overload
+    def __rand__(self, lhs: str) -> 'OptionalResultAnd[_Result]':
+        ...
+
+    @overload
+    def __rand__(self, lhs: lexer.Rule) -> 'OptionalResultAnd[_Result]':
+        ...
+
+    @overload
+    def __rand__(self, lhs: Type['Parsable[_ParsableType]']) -> 'MultipleResultAnd[_Result]':
+        ...
+
+    def __rand__(self, lhs: _RandArgs) -> 'Rule[_Result]':
+        if isinstance(lhs, str) or isinstance(lhs, lexer.Rule):
+            return OptionalResultAnd([LexRule.load(lhs), self])
+        elif issubclass(lhs, Parsable):
+            return MultipleResultAnd([lhs.ref(), self])
+        else:
+            raise TypeError(type(lhs))
 
     def single(self) -> SingleResultRule[_Result]:
         class Adapter(_UnaryRule[_AdapterResult, OptionalResultRule[_AdapterResult]], SingleResultRule[_AdapterResult]):
@@ -532,6 +608,10 @@ class MultipleResultRule(Rule[_Result]):
     def __and__(self, rhs: str) -> 'MultipleResultAnd[_Result]':
         ...
 
+    @overload
+    def __and__(self, rhs: 'Type[Parsable[_ParsableType]]') -> 'MultipleResultAnd[_Result]':
+        ...
+
     def __and__(self, rhs: _AndArgs) -> 'MultipleResultAnd[_Result]':
         if isinstance(rhs, NoResultRule):
             return MultipleResultAnd([self, rhs])
@@ -543,11 +623,30 @@ class MultipleResultRule(Rule[_Result]):
             return MultipleResultAnd([self, rhs])
         elif isinstance(rhs, lexer.Rule) or isinstance(rhs, str):
             return MultipleResultAnd([self, LexRule.load(rhs)])
+        elif issubclass(rhs, _AbstractParsable):
+            return MultipleResultAnd([self, rhs.ref()])
         else:
             raise TypeError(type(rhs))
 
-    def __rand__(self, lhs: str | lexer.Rule) -> 'MultipleResultAnd[_Result]':
-        return MultipleResultAnd([LexRule.load(lhs), self])
+    @overload
+    def __rand__(self, lhs: str) -> 'MultipleResultAnd[_Result]':
+        ...
+
+    @overload
+    def __rand__(self, lhs: lexer.Rule) -> 'MultipleResultAnd[_Result]':
+        ...
+
+    @overload
+    def __rand__(self, lhs: Type['Parsable[_ParsableType]']) -> 'MultipleResultAnd[_Result]':
+        ...
+
+    def __rand__(self, lhs: _RandArgs) -> 'Rule[_Result]':
+        if isinstance(lhs, str) or isinstance(lhs, lexer.Rule):
+            return MultipleResultAnd([LexRule.load(lhs), self])
+        elif issubclass(lhs, Parsable):
+            return MultipleResultAnd([lhs.ref(), self])
+        else:
+            raise TypeError(type(lhs))
 
     def single(self) -> SingleResultRule[_Result]:
         class Adapter(_UnaryRule[_AdapterResult, MultipleResultRule[_AdapterResult]], SingleResultRule[_AdapterResult]):
@@ -893,6 +992,10 @@ class NoResultAnd(_AbstractAnd[_Result, NoResultRule[_Result]], NoResultRule[_Re
     def __and__(self, rhs: str) -> 'NoResultAnd[_Result]':
         ...
 
+    @overload
+    def __and__(self, rhs: 'Type[Parsable[_ParsableType]]') -> 'SingleResultAnd[_Result]':
+        ...
+
     def __and__(self, rhs: _AndArgs) -> 'Rule[_Result]':
         if isinstance(rhs, NoResultRule):
             return NoResultAnd(list(self.children)+[rhs])
@@ -904,11 +1007,30 @@ class NoResultAnd(_AbstractAnd[_Result, NoResultRule[_Result]], NoResultRule[_Re
             return MultipleResultAnd(list(self.children)+[rhs])
         elif isinstance(rhs, lexer.Rule) or isinstance(rhs, str):
             return NoResultAnd(list(self.children)+[LexRule.load(rhs)])
+        elif issubclass(rhs, _AbstractParsable):
+            return SingleResultAnd(list(self.children) + [rhs.ref()])
         else:
             raise TypeError(type(rhs))
 
-    def __rand__(self, lhs: str | lexer.Rule) -> 'NoResultAnd[_Result]':
-        return NoResultAnd([LexRule[_Result].load(lhs)]+list(self))
+    @overload
+    def __rand__(self, lhs: str) -> 'NoResultAnd[_Result]':
+        ...
+
+    @overload
+    def __rand__(self, lhs: lexer.Rule) -> 'NoResultAnd[_Result]':
+        ...
+
+    @overload
+    def __rand__(self, lhs: Type['Parsable[_ParsableType]']) -> 'SingleResultAnd[_Result]':
+        ...
+
+    def __rand__(self, lhs: _RandArgs) -> 'Rule[_Result]':
+        if isinstance(lhs, str) or isinstance(lhs, lexer.Rule):
+            return NoResultAnd([LexRule[_Result].load(lhs)]+list(self))
+        elif issubclass(lhs, Parsable):
+            return SingleResultAnd([lhs.ref()] + list(self))
+        else:
+            raise TypeError(type(lhs))
 
     def __call__(self, state: tokens.TokenStream, scope: Scope[_Result]) -> tokens.TokenStream:
         for child in self:
@@ -948,6 +1070,10 @@ class OptionalResultAnd(_AbstractAnd[_Result, OptionalResultRule[_Result] | NoRe
     def __and__(self, rhs: str) -> 'OptionalResultAnd[_Result]':
         ...
 
+    @overload
+    def __and__(self, rhs: 'Type[Parsable[_ParsableType]]') -> 'MultipleResultAnd[_Result]':
+        ...
+
     def __and__(self, rhs: _AndArgs) -> 'Rule[_Result]':
         if isinstance(rhs, NoResultRule):
             return OptionalResultAnd(list(self.children)+[rhs])
@@ -959,11 +1085,30 @@ class OptionalResultAnd(_AbstractAnd[_Result, OptionalResultRule[_Result] | NoRe
             return MultipleResultAnd(list(self.children)+[rhs])
         elif isinstance(rhs, lexer.Rule) or isinstance(rhs, str):
             return OptionalResultAnd(list(self.children)+[LexRule.load(rhs)])
+        elif issubclass(rhs, _AbstractParsable):
+            return MultipleResultAnd(list(self.children)+[rhs.ref()])
         else:
             raise TypeError(type(rhs))
 
-    def __rand__(self, lhs: str | lexer.Rule) -> 'OptionalResultAnd[_Result]':
-        return OptionalResultAnd([LexRule[_Result].load(lhs)]+list(self))
+    @overload
+    def __rand__(self, lhs: str) -> 'OptionalResultAnd[_Result]':
+        ...
+
+    @overload
+    def __rand__(self, lhs: lexer.Rule) -> 'OptionalResultAnd[_Result]':
+        ...
+
+    @overload
+    def __rand__(self, lhs: Type['Parsable[_ParsableType]']) -> 'MultipleResultAnd[_Result]':
+        ...
+
+    def __rand__(self, lhs: _RandArgs) -> 'Rule[_Result]':
+        if isinstance(lhs, str) or isinstance(lhs, lexer.Rule):
+            return OptionalResultAnd([LexRule[_Result].load(lhs)]+list(self))
+        elif issubclass(lhs, Parsable):
+            return MultipleResultAnd([lhs.ref()] + list(self))
+        else:
+            raise TypeError(type(lhs))
 
     def __call__(self, state: tokens.TokenStream, scope: Scope[_Result]) -> StateAndOptionalResult[_Result]:
         result: Optional[_Result] = None
@@ -1009,6 +1154,10 @@ class SingleResultAnd(_AbstractAnd[_Result, SingleResultRule[_Result] | NoResult
     def __and__(self, rhs: str) -> 'SingleResultAnd[_Result]':
         ...
 
+    @overload
+    def __and__(self, rhs: 'Type[Parsable[_ParsableType]]') -> 'MultipleResultAnd[_Result]':
+        ...
+
     def __and__(self, rhs: _AndArgs) -> 'Rule[_Result]':
         if isinstance(rhs, NoResultRule):
             return SingleResultAnd(list(self.children)+[rhs])
@@ -1020,11 +1169,30 @@ class SingleResultAnd(_AbstractAnd[_Result, SingleResultRule[_Result] | NoResult
             return MultipleResultAnd(list(self.children)+[rhs])
         elif isinstance(rhs, lexer.Rule) or isinstance(rhs, str):
             return SingleResultAnd(list(self.children)+[LexRule.load(rhs)])
+        elif issubclass(rhs, _AbstractParsable):
+            return MultipleResultAnd(list(self.children)+[rhs.ref()])
         else:
             raise TypeError(type(rhs))
 
-    def __rand__(self, lhs: str | lexer.Rule) -> 'SingleResultAnd[_Result]':
-        return SingleResultAnd([LexRule[_Result].load(lhs)]+list(self))
+    @overload
+    def __rand__(self, lhs: str) -> 'SingleResultAnd[_Result]':
+        ...
+
+    @overload
+    def __rand__(self, lhs: lexer.Rule) -> 'SingleResultAnd[_Result]':
+        ...
+
+    @overload
+    def __rand__(self, lhs: Type['Parsable[_ParsableType]']) -> 'MultipleResultAnd[_Result]':
+        ...
+
+    def __rand__(self, lhs: _RandArgs) -> 'Rule[_Result]':
+        if isinstance(lhs, str) or isinstance(lhs, lexer.Rule):
+            return SingleResultAnd([LexRule[_Result].load(lhs)]+list(self))
+        elif issubclass(lhs, Parsable):
+            return MultipleResultAnd([lhs.ref()] + list(self))
+        else:
+            raise TypeError(type(lhs))
 
     def __call__(self, state: tokens.TokenStream, scope: Scope[_Result]) -> StateAndSingleResult[_Result]:
         result: Optional[_Result] = None
@@ -1071,6 +1239,10 @@ class MultipleResultAnd(_AbstractAnd[_Result, Rule[_Result]], MultipleResultRule
     def __and__(self, rhs: str) -> 'MultipleResultAnd[_Result]':
         ...
 
+    @overload
+    def __and__(self, rhs: 'Type[Parsable[_ParsableType]]') -> 'MultipleResultAnd[_Result]':
+        ...
+
     def __and__(self, rhs: _AndArgs) -> 'Rule[_Result]':
         if isinstance(rhs, NoResultRule):
             return MultipleResultAnd(list(self.children)+[rhs])
@@ -1082,11 +1254,30 @@ class MultipleResultAnd(_AbstractAnd[_Result, Rule[_Result]], MultipleResultRule
             return MultipleResultAnd(list(self.children)+[rhs])
         elif isinstance(rhs, lexer.Rule) or isinstance(rhs, str):
             return MultipleResultAnd(list(self.children)+[LexRule.load(rhs)])
+        elif issubclass(rhs, _AbstractParsable):
+            return MultipleResultAnd(list(self.children)+[rhs.ref()])
         else:
             raise TypeError(type(rhs))
 
-    def __rand__(self, lhs: str | lexer.Rule) -> 'MultipleResultAnd[_Result]':
-        return MultipleResultAnd([LexRule[_Result].load(lhs)]+list(self))
+    @overload
+    def __rand__(self, lhs: str) -> 'MultipleResultAnd[_Result]':
+        ...
+
+    @overload
+    def __rand__(self, lhs: lexer.Rule) -> 'MultipleResultAnd[_Result]':
+        ...
+
+    @overload
+    def __rand__(self, lhs: Type['Parsable[_ParsableType]']) -> 'MultipleResultAnd[_Result]':
+        ...
+
+    def __rand__(self, lhs: _RandArgs) -> 'Rule[_Result]':
+        if isinstance(lhs, str) or isinstance(lhs, lexer.Rule):
+            return MultipleResultAnd([LexRule[_Result].load(lhs)]+list(self))
+        elif issubclass(lhs, Parsable):
+            return MultipleResultAnd([lhs.ref()] + list(self))
+        else:
+            raise TypeError(type(lhs))
 
     def __call__(self, state: tokens.TokenStream, scope: Scope[_Result]) -> StateAndMultipleResult[_Result]:
         results: MutableSequence[_Result] = []
@@ -1125,27 +1316,29 @@ class Or(_NaryRule[_Result, SingleResultRule[_Result]], SingleResultRule[_Result
         return lexer_
 
 
-_ParsableType = TypeVar('_ParsableType', bound='Parsable')
-
-
-class Parsable(ABC, Generic[_ParsableType]):
+class _AbstractParsable(ABC, Generic[_Result]):
     @classmethod
     def _name(cls) -> str:
         return cls.__name__
 
     @classmethod
-    def ref(cls) -> Ref[_ParsableType]:
-        return Ref[_ParsableType](cls._name())
+    def ref(cls) -> Ref[_Result]:
+        return Ref[_Result](cls._name())
 
+    @classmethod
+    @abstractmethod
+    def _types(cls) -> Sequence[Type[_Result]]:
+        ...
+
+
+_ParsableType = TypeVar('_ParsableType', bound='Parsable')
+
+
+class Parsable(Generic[_ParsableType], _AbstractParsable[_ParsableType]):
     @classmethod
     @abstractmethod
     def _parse_rule(cls) -> SingleResultRule[_ParsableType]:
         return Or[_ParsableType]([type.ref() for type in cls._types()])
-
-    @classmethod
-    @abstractmethod
-    def _types(cls) -> Sequence[Type[_ParsableType]]:
-        ...
 
     @classmethod
     def parser_(cls) -> Parser[_ParsableType]:
@@ -1164,23 +1357,10 @@ _ParsableWithContextType = TypeVar(
 _ParsableContext = TypeVar('_ParsableContext')
 
 
-class ParsableWithContext(ABC, Generic[_ParsableWithContextType, _ParsableContext]):
-    @classmethod
-    def _name(cls) -> str:
-        return cls.__name__
-
-    @classmethod
-    def ref(cls) -> Ref[_ParsableWithContextType]:
-        return Ref[_ParsableWithContextType](cls._name())
-
+class ParsableWithContext(Generic[_ParsableWithContextType, _ParsableContext], _AbstractParsable[_ParsableWithContextType]):
     @classmethod
     @abstractmethod
     def _parse_rule(cls, context: _ParsableContext) -> SingleResultRule[_ParsableWithContextType]:
-        ...
-
-    @classmethod
-    @abstractmethod
-    def _types(cls) -> Sequence[Type[_ParsableWithContextType]]:
         ...
 
     @classmethod
