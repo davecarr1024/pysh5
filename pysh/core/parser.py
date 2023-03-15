@@ -108,6 +108,15 @@ class _UnaryRule(Generic[_Result, _ChildRuleType], Rule[_Result]):
 _AdapterResult = TypeVar('_AdapterResult')
 _AdapterConvertResult = TypeVar('_AdapterConvertResult')
 
+_AndArgs = Union[
+    'NoResultRule[_Result]',
+    'OptionalResultRule[_Result]',
+    'SingleResultRule[_Result]',
+    'MultipleResultRule[_Result]',
+    lexer.Rule,
+    str,
+]
+
 
 class NoResultRule(Rule[_Result]):
     @abstractmethod
@@ -138,14 +147,7 @@ class NoResultRule(Rule[_Result]):
     def __and__(self, rhs: str) -> 'NoResultAnd[_Result]':
         ...
 
-    def __and__(self, rhs: Union[
-        'NoResultRule[_Result]',
-        'OptionalResultRule[_Result]',
-        'SingleResultRule[_Result]',
-        'MultipleResultRule[_Result]',
-        lexer.Rule,
-        str,
-    ]) -> 'Rule[_Result]':
+    def __and__(self, rhs: _AndArgs``) -> 'Rule[_Result]':
         if isinstance(rhs, NoResultRule):
             return NoResultAnd([self, rhs])
         elif isinstance(rhs, OptionalResultRule):
@@ -240,14 +242,7 @@ class SingleResultRule(Rule[_Result]):
     def __and__(self, rhs: str) -> 'SingleResultAnd[_Result]':
         ...
 
-    def __and__(self, rhs: Union[
-        'NoResultRule[_Result]',
-        'OptionalResultRule[_Result]',
-        'SingleResultRule[_Result]',
-        'MultipleResultRule[_Result]',
-        lexer.Rule,
-        str,
-    ]) -> 'Rule[_Result]':
+    def __and__(self, rhs: _AndArgs) -> 'Rule[_Result]':
         if isinstance(rhs, NoResultRule):
             return SingleResultAnd([self, rhs])
         elif isinstance(rhs, OptionalResultRule):
@@ -395,14 +390,7 @@ class OptionalResultRule(Rule[_Result]):
     def __and__(self, rhs: str) -> 'OptionalResultAnd[_Result]':
         ...
 
-    def __and__(self, rhs: Union[
-        'NoResultRule[_Result]',
-        'OptionalResultRule[_Result]',
-        'SingleResultRule[_Result]',
-        'MultipleResultRule[_Result]',
-        lexer.Rule,
-        str,
-    ]) -> 'Rule[_Result]':
+    def __and__(self, rhs: _AndArgs) -> 'Rule[_Result]':
         if isinstance(rhs, NoResultRule):
             return OptionalResultAnd([self, rhs])
         elif isinstance(rhs, OptionalResultRule):
@@ -544,14 +532,7 @@ class MultipleResultRule(Rule[_Result]):
     def __and__(self, rhs: str) -> 'MultipleResultAnd[_Result]':
         ...
 
-    def __and__(self, rhs: Union[
-        'NoResultRule[_Result]',
-        'OptionalResultRule[_Result]',
-        'SingleResultRule[_Result]',
-        'MultipleResultRule[_Result]',
-        lexer.Rule,
-        str,
-    ]) -> 'MultipleResultAnd[_Result]':
+    def __and__(self, rhs: _AndArgs) -> 'MultipleResultAnd[_Result]':
         if isinstance(rhs, NoResultRule):
             return MultipleResultAnd([self, rhs])
         elif isinstance(rhs, OptionalResultRule):
@@ -912,14 +893,7 @@ class NoResultAnd(_AbstractAnd[_Result, NoResultRule[_Result]], NoResultRule[_Re
     def __and__(self, rhs: str) -> 'NoResultAnd[_Result]':
         ...
 
-    def __and__(self, rhs: Union[
-        'NoResultRule[_Result]',
-        'OptionalResultRule[_Result]',
-        'SingleResultRule[_Result]',
-        'MultipleResultRule[_Result]',
-        lexer.Rule,
-        str,
-    ]) -> 'Rule[_Result]':
+    def __and__(self, rhs: _AndArgs) -> 'Rule[_Result]':
         if isinstance(rhs, NoResultRule):
             return NoResultAnd(list(self.children)+[rhs])
         elif isinstance(rhs, OptionalResultRule):
@@ -974,14 +948,7 @@ class OptionalResultAnd(_AbstractAnd[_Result, OptionalResultRule[_Result] | NoRe
     def __and__(self, rhs: str) -> 'OptionalResultAnd[_Result]':
         ...
 
-    def __and__(self, rhs: Union[
-        'NoResultRule[_Result]',
-        'OptionalResultRule[_Result]',
-        'SingleResultRule[_Result]',
-        'MultipleResultRule[_Result]',
-        lexer.Rule,
-        str,
-    ]) -> 'Rule[_Result]':
+    def __and__(self, rhs: _AndArgs) -> 'Rule[_Result]':
         if isinstance(rhs, NoResultRule):
             return OptionalResultAnd(list(self.children)+[rhs])
         elif isinstance(rhs, OptionalResultRule):
@@ -1042,14 +1009,7 @@ class SingleResultAnd(_AbstractAnd[_Result, SingleResultRule[_Result] | NoResult
     def __and__(self, rhs: str) -> 'SingleResultAnd[_Result]':
         ...
 
-    def __and__(self, rhs: Union[
-        'NoResultRule[_Result]',
-        'OptionalResultRule[_Result]',
-        'SingleResultRule[_Result]',
-        'MultipleResultRule[_Result]',
-        lexer.Rule,
-        str,
-    ]) -> 'Rule[_Result]':
+    def __and__(self, rhs: _AndArgs) -> 'Rule[_Result]':
         if isinstance(rhs, NoResultRule):
             return SingleResultAnd(list(self.children)+[rhs])
         elif isinstance(rhs, OptionalResultRule):
@@ -1111,14 +1071,7 @@ class MultipleResultAnd(_AbstractAnd[_Result, Rule[_Result]], MultipleResultRule
     def __and__(self, rhs: str) -> 'MultipleResultAnd[_Result]':
         ...
 
-    def __and__(self, rhs: Union[
-        'NoResultRule[_Result]',
-        'OptionalResultRule[_Result]',
-        'SingleResultRule[_Result]',
-        'MultipleResultRule[_Result]',
-        lexer.Rule,
-        str,
-    ]) -> 'Rule[_Result]':
+    def __and__(self, rhs: _AndArgs) -> 'Rule[_Result]':
         if isinstance(rhs, NoResultRule):
             return MultipleResultAnd(list(self.children)+[rhs])
         elif isinstance(rhs, OptionalResultRule):
