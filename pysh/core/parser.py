@@ -1361,14 +1361,14 @@ class ParsableWithContext(Generic[_ParsableWithContextType, _ParsableContext], _
     @classmethod
     @abstractmethod
     def _parse_rule(cls, context: _ParsableContext) -> SingleResultRule[_ParsableWithContextType]:
-        ...
+        return Or[_ParsableWithContextType]([type.ref() for type in cls._types()])
 
     @classmethod
     def parser_(cls, context: _ParsableContext) -> Parser[_ParsableWithContextType]:
         return Parser[_ParsableWithContextType](
             cls._name(),
             Scope[_ParsableWithContextType](
-                {cls._name(): Or[_ParsableWithContextType]([type.ref() for type in cls._types()])} |
+                {cls._name(): cls._parse_rule(context)} |
                 {type._name(): type._parse_rule(context)
                  for type in cls._types()}
             )
